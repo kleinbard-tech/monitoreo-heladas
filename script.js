@@ -28,20 +28,28 @@ const graficaTemperatura = new Chart(ctx, {
                 borderColor: "#2563eb",
                 backgroundColor: "rgba(37, 99, 235, 0.1)",
                 tension: 0.3,
-                fill: true
+                fill: true,
+                pointRadius: 4,
+                pointHoverRadius: 6
             },
             {
                 label: "Punto de rocío",
                 data: [],
                 borderColor: "#0891b2",
                 borderDash: [5, 5],
-                tension: 0.3
+                tension: 0.3,
+                pointRadius: 4,
+                pointHoverRadius: 6
             }
         ]
     },
     options: {
-        responsive: false, // Permite que el canvas supere el ancho del contenedor y active el scroll
+        responsive: true,
         maintainAspectRatio: false,
+        interaction: {
+            mode: 'index',
+            intersect: false
+        },
         scales: {
             y: { title: { display: true, text: "Temperatura (°C)" } },
             x: { title: { display: true, text: "Hora" } }
@@ -50,7 +58,7 @@ const graficaTemperatura = new Chart(ctx, {
 });
 
 // =====================================================
-// ACTUALIZAR HISTORIAL Y DESPLAZAMIENTO DEL GRÁFICO
+// ACTUALIZAR HISTORIAL
 // =====================================================
 async function actualizarHistorial() {
     try {
@@ -80,25 +88,27 @@ function actualizarGrafica() {
     const nodoSeleccionado = document.getElementById("seleccionNodo").value;
     const datos = datosNodos[nodoSeleccionado];
 
-    const canvasGrafico = document.getElementById("graficaTemperatura");
     const contenedorScroll = document.querySelector(".contenedor-grafico-scroll");
+    const areaGrafica = document.querySelector(".area-grafica");
 
-    if (canvasGrafico && datos.horarios.length > 0) {
-        // Se calculan 40px por cada punto de medición para mantener la holgura (mínimo 900px)
-        const anchoCalculado = Math.max(900, datos.horarios.length * 40);
-        
-        canvasGrafico.style.width = `${anchoCalculado}px`;
-        canvasGrafico.width = anchoCalculado; // Ajusta la resolución interna de Chart.js
+    if (contenedorScroll && datos.horarios.length > 0) {
+        // Asigna 35px por medición. Si supera el ancho visible, estira el contenedor.
+        const anchoMinimoContainer = areaGrafica.clientWidth;
+        const anchoCalculado = Math.max(anchoMinimoContainer, datos.horarios.length * 35);
+        contenedorScroll.style.width = `${anchoCalculado}px`;
     }
 
     graficaTemperatura.data.labels = datos.horarios;
     graficaTemperatura.data.datasets[0].data = datos.temperatura;
     graficaTemperatura.data.datasets[1].data = datos.puntoRocio;
+    
+    // Forzamos al canvas a re-renderizarse nítido
+    graficaTemperatura.resize();
     graficaTemperatura.update();
 
-    // Mueve la barra de scroll automáticamente hacia el dato más reciente
-    if (contenedorScroll) {
-        contenedorScroll.scrollLeft = contenedorScroll.scrollWidth;
+    // Scroll automático a la derecha (al dato más reciente)
+    if (areaGrafica) {
+        areaGrafica.scrollLeft = areaGrafica.scrollWidth;
     }
 }
 
@@ -183,8 +193,8 @@ setInterval(actualizarHistorial, 5000);
 // =====================================================
 // LÓGICA DEL MAPA DESPLEGABLE
 // =====================================================
-const coordenadasNodo1 = [-38.845769, -68.071461]; // Manzana 1
-const coordenadasNodo2 = [-38.845947, -68.071986]; // Ciruela 1
+const coordenadasNodo1 = [-38.845769, -68.071461];
+const coordenadasNodo2 = [-38.845947, -68.071986];
 
 let mapaInicializado = false;
 let mapa;

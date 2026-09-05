@@ -12,17 +12,11 @@
     --status-offline-bg: #fee2e2;
 }
 
-
-/* =====================================================
-   CONFIGURACIÓN GENERAL
-   ===================================================== */
-
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
 }
-
 
 body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -31,775 +25,376 @@ body {
     line-height: 1.5;
 }
 
-
-
-/* =====================================================
-   ENCABEZADO INSTITUCIONAL
-   ===================================================== */
-
+/* ENCABEZADO INSTITUCIONAL */
 .encabezado {
     background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
     color: white;
-
     padding: 24px 20px 30px;
-
     text-align: center;
-
     position: relative;
-
     border-bottom: 3px solid var(--primary-color);
-
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
 }
 
-
-/* -----------------------------------------------------
-   ZONA INSTITUCIONAL
-   ----------------------------------------------------- */
-
 .header-institucional {
-
     display: flex;
-
     align-items: center;
-
     justify-content: center;
-
     gap: 15px;
-
     padding-bottom: 16px;
-
     margin-bottom: 20px;
-
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-
-/* -----------------------------------------------------
-   LOGOS INSTITUCIONALES (ENCABEZADO Y FOOTER IGUALES)
-   ----------------------------------------------------- */
-
 .logo-unco,
 .logo-unco-footer {
-
     width: 48px;
-
     height: 48px;
-
     object-fit: cover;
-
     border-radius: 50%;
-
     background-color: white;
-
     padding: 2px;
-
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-
     flex-shrink: 0;
 }
 
-
-/* -----------------------------------------------------
-   TEXTO INSTITUCIONAL
-   ----------------------------------------------------- */
-
 .texto-institucional {
-
     display: flex;
-
     flex-direction: column;
-
     text-align: left;
-
     line-height: 1.3;
 }
 
-
 .texto-institucional span {
-
     font-size: 11px;
-
     text-transform: uppercase;
-
     letter-spacing: 1.5px;
-
     color: #94a3b8;
 }
 
-
 .texto-institucional strong {
-
     font-size: 15px;
-
     color: #f8fafc;
-
     font-weight: 600;
-
     letter-spacing: 0.5px;
 }
 
-
-
-/* =====================================================
-   CONTENIDO DEL ENCABEZADO
-   ===================================================== */
-
 .header-badge {
-
     display: inline-block;
-
     background: rgba(37, 99, 235, 0.15);
-
     color: #60a5fa;
-
     border: 1px solid rgba(96, 165, 250, 0.3);
-
     padding: 4px 14px;
-
     border-radius: 20px;
-
     font-size: 12px;
-
     font-weight: 600;
-
     text-transform: uppercase;
-
     letter-spacing: 0.8px;
-
     margin-bottom: 12px;
 }
 
-
 .encabezado h1 {
-
     font-size: 32px;
-
     font-weight: 700;
-
     letter-spacing: -0.5px;
-
     margin: 0;
-
     color: #f8fafc;
 }
 
-
 .header-autor {
-
     margin-top: 10px;
-
     font-size: 14px;
-
     color: #94a3b8;
-
     display: flex;
-
     justify-content: center;
-
     align-items: center;
-
     gap: 6px;
 }
 
-
 .header-autor strong {
-
     color: #e2e8f0;
-
     font-weight: 600;
-
     letter-spacing: 0.3px;
 }
 
-
-
-/* =====================================================
-   CONTENEDOR PRINCIPAL
-   ===================================================== */
-
+/* CONTENEDOR PRINCIPAL */
 .contenedor {
-
     width: 92%;
-
     max-width: 1200px;
-
     margin: 30px auto;
-
     display: flex;
-
     flex-direction: column;
-
     gap: 25px;
 }
 
-
-
-/* =====================================================
-   NODOS
-   ===================================================== */
-
+/* NODOS */
 .nodos {
-
     display: grid;
-
-    grid-template-columns: repeat(
-        auto-fit,
-        minmax(320px, 1fr)
-    );
-
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 20px;
 }
 
-
 .nodo {
-
     background: var(--card-bg);
-
     border-radius: 12px;
-
     padding: 24px;
-
     border: 1px solid var(--border-color);
-
-    box-shadow:
-        0 1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-
 .nodo-header {
-
     display: flex;
-
     justify-content: space-between;
-
     align-items: center;
-
     margin-bottom: 20px;
 }
 
-
 .nodo h2 {
-
     font-size: 18px;
-
     font-weight: 600;
 }
-
-
-
-/* =====================================================
-   ESTADO DE CONEXIÓN
-   ===================================================== */
 
 .conexion {
-
     display: inline-flex;
-
     align-items: center;
-
     gap: 6px;
-
     padding: 4px 10px;
-
     border-radius: 20px;
-
     font-size: 13px;
-
     font-weight: 600;
 }
 
-
 .conexion.conectado {
-
     background-color: var(--status-online-bg);
-
     color: var(--status-online);
 }
 
-
 .conexion.desconectado {
-
     background-color: var(--status-offline-bg);
-
     color: var(--status-offline);
 }
 
-
 .indicador {
-
     width: 8px;
-
     height: 8px;
-
     border-radius: 50%;
 }
 
-
 .conectado .indicador {
-
     background-color: var(--status-online);
 }
 
-
 .desconectado .indicador {
-
     background-color: var(--status-offline);
 }
 
-
-
-/* =====================================================
-   DATOS
-   ===================================================== */
-
 .datos {
-
     display: flex;
-
     flex-direction: column;
-
     gap: 12px;
 }
 
-
 .dato {
-
     display: flex;
-
     justify-content: space-between;
-
     align-items: center;
-
     padding: 10px 0;
-
     border-bottom: 1px solid var(--border-color);
 }
 
-
 .dato:last-child {
-
     border-bottom: none;
 }
 
-
 .etiqueta {
-
     font-size: 14px;
-
     color: var(--text-secondary);
 }
 
-
 .valor {
-
     font-size: 18px;
-
     font-weight: 600;
 }
 
-
 .dato-principal {
-
     background: #f8fafc;
-
     padding: 12px;
-
     border-radius: 8px;
-
     border-bottom: none;
 }
 
-
 .dato-principal .valor {
-
     font-size: 24px;
-
     color: var(--primary-color);
 }
 
-
 .actualizacion {
-
     margin-top: 15px;
-
     font-size: 12px;
-
     color: var(--text-secondary);
-
     text-align: right;
 }
 
-
-
-/* =====================================================
-   GRÁFICA DE HISTORIAL Y SCROLL HORIZONTAL
-   ===================================================== */
-
+/* GRÁFICA DE HISTORIAL CON SCROLL PERFECTO */
 .grafica,
 .estado-general {
-
     background: var(--card-bg);
-
     border-radius: 12px;
-
     padding: 24px;
-
     border: 1px solid var(--border-color);
-
-    box-shadow:
-        0 1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-
 .grafica-header {
-
     display: flex;
-
     justify-content: space-between;
-
     align-items: center;
-
     margin-bottom: 20px;
 }
 
-
 .selector-nodo select {
-
     padding: 6px 12px;
-
     border-radius: 6px;
-
     border: 1px solid var(--border-color);
-
     background-color: white;
-
     font-size: 14px;
 }
 
-
 .area-grafica {
-
-    height: 320px;
-
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
     position: relative;
 }
 
-/* Habilita el desplazamiento horizontal permitiendo la barra de scroll */
 .contenedor-grafico-scroll {
-    width: 100%;
-    height: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
+    position: relative;
+    height: 320px;
+    min-width: 100%;
 }
 
-/* El canvas mantendrá un ancho mínimo o dinámico para activar la barra */
 .contenedor-grafico-scroll canvas {
-    min-width: 800px;
+    width: 100% !important;
     height: 100% !important;
 }
 
-
-
-/* =====================================================
-   DESPLEGABLE MAPA
-   ===================================================== */
-
+/* MAPA */
 .mapa-seccion {
-
     background: var(--card-bg);
-
     border-radius: 12px;
-
     border: 1px solid var(--border-color);
-
-    box-shadow:
-        0 1px 3px rgba(0, 0, 0, 0.05);
-
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     overflow: hidden;
 }
 
-
 details.mapa-seccion summary {
-
     list-style: none;
 }
 
-
 details.mapa-seccion summary::-webkit-details-marker {
-
     display: none;
 }
 
-
 .mapa-header {
-
     display: flex;
-
     justify-content: space-between;
-
     align-items: center;
-
     padding: 18px 24px;
-
     cursor: pointer;
-
     user-select: none;
-
     transition: background-color 0.2s ease;
 }
 
-
 .mapa-header:hover {
-
     background-color: #f8fafc;
 }
 
-
 .mapa-header h2 {
-
     font-size: 18px;
-
     font-weight: 600;
-
     margin: 0;
 }
 
-
 .icono-desplegar {
-
     font-size: 12px;
-
     color: var(--text-secondary);
-
     transition: transform 0.3s ease;
 }
 
-
 details[open] .icono-desplegar {
-
     transform: rotate(180deg);
 }
 
-
 .mapa-contenido {
-
     padding: 0 24px 24px 24px;
 }
 
-
 #mapa {
-
     height: 350px;
-
     width: 100%;
-
     border-radius: 8px;
-
     border: 1px solid var(--border-color);
-
     z-index: 1;
 }
 
-
-
-/* =====================================================
-   ESTADO GENERAL
-   ===================================================== */
-
+/* ESTADO GENERAL */
 .estado-general {
-
     text-align: center;
 }
 
-
 .estado-normal {
-
     font-size: 24px;
-
     font-weight: 700;
-
     color: var(--status-online);
-
     margin: 10px 0 5px;
 }
 
-
-
-/* =====================================================
-   PIE DE PÁGINA
-   ===================================================== */
-
+/* PIE DE PÁGINA */
 .pie-pagina {
-
     background: #0f172a;
-
     color: #94a3b8;
-
     padding: 25px 20px;
-
     margin-top: 40px;
-
     border-top: 1px solid var(--border-color);
-
     font-size: 13px;
 }
 
-
 .footer-contenido {
-
     max-width: 1200px;
-
     margin: 0 auto;
-
     display: flex;
-
     flex-direction: row;
-
     align-items: center;
-
     justify-content: center;
-
     gap: 15px;
-
     text-align: left;
 }
 
-
 .pie-pagina strong {
-
     color: #f8fafc;
 }
 
-
 .footer-subtexto {
-
     font-size: 12px;
-
     color: #64748b;
 }
 
-
-
-/* =====================================================
-   ADAPTACIÓN PARA CELULARES
-   ===================================================== */
-
 @media (max-width: 600px) {
-
-    .encabezado {
-
-        padding: 20px 15px 25px;
-    }
-
-
-    .header-institucional {
-
-        gap: 10px;
-    }
-
-
-    .logo-unco,
-    .logo-unco-footer {
-
-        width: 40px;
-
-        height: 40px;
-    }
-
-
-    .texto-institucional {
-
-        text-align: left;
-    }
-
-
-    .texto-institucional span {
-
-        font-size: 9px;
-
-        letter-spacing: 1px;
-    }
-
-
-    .texto-institucional strong {
-
-        font-size: 13px;
-    }
-
-
-    .encabezado h1 {
-
-        font-size: 28px;
-    }
-
-
-    .header-autor {
-
-        flex-direction: column;
-
-        gap: 2px;
-
-        font-size: 13px;
-    }
-
-
-    .nodos {
-
-        grid-template-columns: 1fr;
-    }
-
-
-    .nodo {
-
-        min-width: 0;
-    }
-
-
-    .grafica-header {
-
-        flex-direction: column;
-
-        align-items: flex-start;
-
-        gap: 12px;
-    }
-
-
-    .selector-nodo {
-
-        width: 100%;
-    }
-
-
-    .selector-nodo select {
-
-        width: 100%;
-    }
-
-
-    .mapa-header {
-
-        padding: 16px 18px;
-    }
-
-
-    .mapa-header h2 {
-
-        font-size: 16px;
-    }
-
-
-    .mapa-contenido {
-
-        padding: 0 15px 15px 15px;
-    }
-
-
-    #mapa {
-
-        height: 300px;
-    }
-
+    .encabezado { padding: 20px 15px 25px; }
+    .header-institucional { gap: 10px; }
+    .logo-unco, .logo-unco-footer { width: 40px; height: 40px; }
+    .texto-institucional { text-align: left; }
+    .texto-institucional span { font-size: 9px; letter-spacing: 1px; }
+    .texto-institucional strong { font-size: 13px; }
+    .encabezado h1 { font-size: 28px; }
+    .header-autor { flex-direction: column; gap: 2px; font-size: 13px; }
+    .nodos { grid-template-columns: 1fr; }
+    .nodo { min-width: 0; }
+    .grafica-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .selector-nodo { width: 100%; }
+    .selector-nodo select { width: 100%; }
+    .mapa-header { padding: 16px 18px; }
+    .mapa-header h2 { font-size: 16px; }
+    .mapa-contenido { padding: 0 15px 15px 15px; }
+    #mapa { height: 300px; }
 }
