@@ -433,7 +433,7 @@ body {
 
 
 /* =====================================================
-   GRÁFICA DE HISTORIAL Y SCROLL
+   GRÁFICA DE HISTORIAL Y SCROLL HORIZONTAL
    ===================================================== */
 
 .grafica,
@@ -485,7 +485,7 @@ body {
     position: relative;
 }
 
-/* Permite el scroll horizontal en la gráfica sin alterar la caja */
+/* Habilita el desplazamiento horizontal permitiendo la barra de scroll */
 .contenedor-grafico-scroll {
     width: 100%;
     height: 100%;
@@ -494,9 +494,9 @@ body {
     -webkit-overflow-scrolling: touch;
 }
 
-/* Ancho mínimo responsivo para generar la barra al acumular puntos */
+/* El canvas mantendrá un ancho mínimo o dinámico para activar la barra */
 .contenedor-grafico-scroll canvas {
-    min-width: 650px;
+    min-width: 800px;
     height: 100% !important;
 }
 

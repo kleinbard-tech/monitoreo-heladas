@@ -50,7 +50,7 @@ const graficaTemperatura = new Chart(ctx, {
 });
 
 // =====================================================
-// ACTUALIZAR HISTORIAL
+// ACTUALIZAR HISTORIAL Y DESPLAZAMIENTO DEL GRÁFICO
 // =====================================================
 async function actualizarHistorial() {
     try {
@@ -80,10 +80,23 @@ function actualizarGrafica() {
     const nodoSeleccionado = document.getElementById("seleccionNodo").value;
     const datos = datosNodos[nodoSeleccionado];
 
+    // Calcula el ancho expandido para que aparezca la barra al acumular lecturas
+    const contenedorScroll = document.querySelector(".contenedor-grafico-scroll");
+    if (contenedorScroll && datos.horarios.length > 0) {
+        // Se otorgan 35px por cada medición registrada en el historial (mínimo 800px)
+        const anchoDinamico = Math.max(800, datos.horarios.length * 35);
+        ctx.style.width = `${anchoDinamico}px`;
+    }
+
     graficaTemperatura.data.labels = datos.horarios;
     graficaTemperatura.data.datasets[0].data = datos.temperatura;
     graficaTemperatura.data.datasets[1].data = datos.puntoRocio;
     graficaTemperatura.update();
+
+    // Desplaza la barra automáticamente hacia la derecha para mostrar la lectura más reciente
+    if (contenedorScroll) {
+        contenedorScroll.scrollLeft = contenedorScroll.scrollWidth;
+    }
 }
 
 // =====================================================
@@ -167,7 +180,6 @@ setInterval(actualizarHistorial, 5000);
 // =====================================================
 // LÓGICA DEL MAPA DESPLEGABLE
 // =====================================================
-// Coordenadas reales
 const coordenadasNodo1 = [-38.845769, -68.071461]; // Manzana 1
 const coordenadasNodo2 = [-38.845947, -68.071986]; // Ciruela 1
 
