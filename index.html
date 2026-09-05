@@ -1,76 +1,395 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitoreo de Agrometeorología - UNCo</title>
+
+    <title>Monitoreo de Heladas</title>
+
+    <!-- CSS de Leaflet para el mapa satelital -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Estilos propios -->
     <link rel="stylesheet" href="estilo.css">
-    <!-- Chart.js para los gráficos -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
 
-    <header>
-        <div class="header-container">
-            <img src="logo-unco.jpg" alt="Logo UNCo" class="logo">
-            <div>
-                <h1>Sistema de Monitoreo Agrometeorológico</h1>
-                <p>Prevención y Alerta Temprana de Heladas</p>
+    <!-- =====================================================
+         ENCABEZADO INSTITUCIONAL
+         ===================================================== -->
+
+    <header class="encabezado">
+
+        <div class="header-institucional">
+
+            <!-- LOGO UNIVERSIDAD -->
+            <img
+                src="logo-unco.jpg"
+                alt="Logo de la Universidad Nacional del Comahue"
+                class="logo-unco"
+            >
+
+            <div class="texto-institucional">
+                <span>Facultad de Ingeniería</span>
+                <strong>Universidad Nacional del Comahue</strong>
             </div>
+
         </div>
+
+
+        <div class="header-contenido">
+
+            <div class="header-badge">
+                Proyecto Integrador Profesional
+            </div>
+
+            <h1>Monitoreo de Heladas</h1>
+
+            <div class="header-autor">
+                <span>Desarrollado por:</span>
+                <strong>Matías Ezequiel Kleinbard</strong>
+            </div>
+
+        </div>
+
     </header>
 
+
+    <!-- =====================================================
+         CONTENIDO PRINCIPAL
+         ===================================================== -->
+
     <main class="contenedor">
-        
-        <!-- TARJETAS DE ESTADO DE LOS NODOS -->
-        <section class="seccion-nodos">
-            <h2>Estado Actual de Sensores</h2>
-            <div id="tarjetas-nodos" class="grid-nodos">
-                <!-- Se cargan dinámicamente con JavaScript -->
-                <p class="cargando">Cargando mediciones...</p>
-            </div>
+
+
+        <!-- =================================================
+             1. ESTADO AMBIENTAL GENERAL (AHORA ARRIBA)
+             ================================================= -->
+
+        <section class="estado-general">
+
+            <h2>
+                Estado ambiental
+            </h2>
+
+            <p class="estado-normal" id="estadoGeneral">
+                Condición normal
+            </p>
+
+            <p id="mensajeEstado">
+                Sin indicios de helada en este momento.
+            </p>
+
         </section>
 
-        <!-- GRÁFICO DE TEMPERATURA CON DESPLAZAMIENTO HORIZONTAL -->
-        <section class="seccion-grafico">
-            <h2>Evolución de Temperatura y Punto de Rocío</h2>
-            <div class="contenedor-grafico">
-                <canvas id="graficoTemperatura"></canvas>
+
+        <!-- =================================================
+             2. INFORMACIÓN DE LOS NODOS
+             ================================================= -->
+
+        <section class="nodos">
+
+
+            <!-- NODO 1 -->
+
+            <div class="nodo">
+
+                <div class="nodo-header">
+
+                    <h2>Nodo 1 (Manzana 1)</h2>
+
+                    <p class="conexion conectado" id="nodo1-conexion">
+
+                        <span class="indicador"></span>
+
+                        <span class="texto-conexion">
+                            Conectado
+                        </span>
+
+                    </p>
+
+                </div>
+
+
+                <div class="datos">
+
+                    <div class="dato dato-principal">
+
+                        <span class="etiqueta">
+                            Temperatura DS18B20
+                        </span>
+
+                        <span class="valor" id="nodo1-temperaturaDS">
+                            -- °C
+                        </span>
+
+                    </div>
+
+
+                    <div class="dato">
+
+                        <span class="etiqueta">
+                            Temperatura DHT22
+                        </span>
+
+                        <span class="valor" id="nodo1-temperaturaDHT">
+                            -- °C
+                        </span>
+
+                    </div>
+
+
+                    <div class="dato">
+
+                        <span class="etiqueta">
+                            Humedad relativa
+                        </span>
+
+                        <span class="valor" id="nodo1-humedad">
+                            -- %
+                        </span>
+
+                    </div>
+
+
+                    <div class="dato">
+
+                        <span class="etiqueta">
+                            Punto de rocío
+                        </span>
+
+                        <span class="valor" id="nodo1-puntoRocio">
+                            -- °C
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <p class="actualizacion" id="nodo1-actualizacion">
+                    Última medición: --
+                </p>
+
             </div>
+
+
+
+            <!-- NODO 2 -->
+
+            <div class="nodo">
+
+                <div class="nodo-header">
+
+                    <h2>Nodo 2 (Ciruela 1)</h2>
+
+                    <p class="conexion desconectado" id="nodo2-conexion">
+
+                        <span class="indicador"></span>
+
+                        <span class="texto-conexion">
+                            Desconectado
+                        </span>
+
+                    </p>
+
+                </div>
+
+
+                <div class="datos">
+
+                    <div class="dato dato-principal">
+
+                        <span class="etiqueta">
+                            Temperatura DS18B20
+                        </span>
+
+                        <span class="valor" id="nodo2-temperaturaDS">
+                            -- °C
+                        </span>
+
+                    </div>
+
+
+                    <div class="dato">
+
+                        <span class="etiqueta">
+                            Temperatura DHT22
+                        </span>
+
+                        <span class="valor" id="nodo2-temperaturaDHT">
+                            -- °C
+                        </span>
+
+                    </div>
+
+
+                    <div class="dato">
+
+                        <span class="etiqueta">
+                            Humedad relativa
+                        </span>
+
+                        <span class="valor" id="nodo2-humedad">
+                            -- %
+                        </span>
+
+                    </div>
+
+
+                    <div class="dato">
+
+                        <span class="etiqueta">
+                            Punto de rocío
+                        </span>
+
+                        <span class="valor" id="nodo2-puntoRocio">
+                            -- °C
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <p class="actualizacion" id="nodo2-actualizacion">
+                    Última medición: --
+                </p>
+
+            </div>
+
         </section>
 
-        <!-- TABLA DE HISTORIAL DE MEDICIONES -->
-        <section class="seccion-tabla">
-            <h2>Historial Reciente de Mediciones</h2>
-            <div class="tabla-responsive">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Fecha y Hora</th>
-                            <th>Nodo</th>
-                            <th>Medición #</th>
-                            <th>T. DS18B20 (°C)</th>
-                            <th>T. DHT22 (°C)</th>
-                            <th>Humedad (%)</th>
-                            <th>Punto Rocío (°C)</th>
-                            <th>Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabla-historial">
-                        <tr>
-                            <td colspan="8" class="cargando">Esperando datos del servidor...</td>
-                        </tr>
-                    </tbody>
-                </table>
+
+
+        <!-- =================================================
+             3. GRÁFICA DE HISTORIAL
+             ================================================= -->
+
+        <section class="grafica">
+
+            <div class="grafica-header">
+
+                <h2>
+                    Temperatura y punto de rocío
+                </h2>
+
+
+                <div class="selector-nodo">
+
+                    <label for="seleccionNodo">
+                        Mostrar datos de:
+                    </label>
+
+                    <select id="seleccionNodo">
+
+                        <option value="nodo1">
+                            Nodo 1
+                        </option>
+
+                        <option value="nodo2">
+                            Nodo 2
+                        </option>
+
+                    </select>
+
+                </div>
+
             </div>
+
+
+            <div class="area-grafica">
+
+                <canvas id="graficaTemperatura"></canvas>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             4. SECCIÓN DESPLEGABLE DE MAPA
+             ================================================= -->
+
+        <section class="mapa-seccion">
+
+            <details id="desplegableMapa">
+
+                <summary class="mapa-header">
+
+                    <h2>
+                        Ver Ubicación Geográfica de los Nodos
+                    </h2>
+
+                    <span class="icono-desplegar">
+                        ▼
+                    </span>
+
+                </summary>
+
+
+                <div class="mapa-contenido">
+
+                    <div id="mapa"></div>
+
+                </div>
+
+            </details>
+
         </section>
 
     </main>
 
-    <footer>
-        <p>Proyecto Integrador Profesional - Universidad Nacional del Comahue</p>
+
+
+    <!-- =====================================================
+         PIE DE PÁGINA
+         ===================================================== -->
+
+    <footer class="pie-pagina">
+
+        <div class="footer-contenido">
+
+            <img
+                src="logo-unco.jpg"
+                alt="Logo de la Universidad Nacional del Comahue"
+                class="logo-unco-footer"
+            >
+
+            <div>
+                <p>
+                    <strong>
+                        Facultad de Ingeniería — Universidad Nacional del Comahue
+                    </strong>
+                </p>
+
+                <p class="footer-subtexto">
+                    Proyecto Integrador Profesional — Monitoreo de Heladas en Tiempo Real
+                </p>
+            </div>
+
+        </div>
+
     </footer>
 
+
+
+    <!-- =====================================================
+         LIBRERÍAS Y SCRIPTS
+         ===================================================== -->
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Leaflet -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- JavaScript propio -->
     <script src="script.js"></script>
+
 </body>
+
 </html>

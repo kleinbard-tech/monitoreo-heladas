@@ -1,153 +1,209 @@
-let grafico = null;
+// =====================================================
+// CONFIGURACIÓN DE ENDPOINTS
+// =====================================================
+const URL_DATOS = "/datos";
+const URL_HISTORIAL = "/historial";
 
-// Ejecutar al cargar la página
-document.addEventListener("DOMContentLoaded", () => {
-    obtenerDatosServidor();
-    // Consultar nuevos datos cada 5 segundos
-    setInterval(obtenerDatosServidor, 5000);
+// =====================================================
+// DATOS DE NODO PARA GRÁFICAS
+// =====================================================
+const datosNodos = {
+    nodo1: { horarios: [], temperatura: [], puntoRocio: [] },
+    nodo2: { horarios: [], temperatura: [], puntoRocio: [] }
+};
+
+// =====================================================
+// INICIALIZACIÓN DE CHART.JS
+// =====================================================
+const ctx = document.getElementById("graficaTemperatura");
+
+const graficaTemperatura = new Chart(ctx, {
+    type: "line",
+    data: {
+        labels: [],
+        datasets: [
+            {
+                label: "Temperatura DS18B20",
+                data: [],
+                borderColor: "#2563eb",
+                backgroundColor: "rgba(37, 99, 235, 0.1)",
+                tension: 0.3,
+                fill: true
+            },
+            {
+                label: "Punto de rocío",
+                data: [],
+                borderColor: "#0891b2",
+                borderDash: [5, 5],
+                tension: 0.3
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: { title: { display: true, text: "Temperatura (°C)" } },
+            x: { title: { display: true, text: "Hora" } }
+        }
+    }
 });
 
-async function obtenerDatosServidor() {
+// =====================================================
+// ACTUALIZAR HISTORIAL
+// =====================================================
+async function actualizarHistorial() {
     try {
-        // Obtener datos actuales
-        const resDatos = await fetch("/datos");
-        const datosActuales = await resDatos.json();
+        const respuesta = await fetch(URL_HISTORIAL);
+        const historial = await respuesta.json();
 
-        // Obtener historial completo
-        const resHistorial = await fetch("/historial");
-        const historial = await resHistorial.json();
+        datosNodos.nodo1 = { horarios: [], temperatura: [], puntoRocio: [] };
+        datosNodos.nodo2 = { horarios: [], temperatura: [], puntoRocio: [] };
 
-        actualizarTarjetas(datosActuales);
-        actualizarTabla(historial);
-        actualizarGrafico(historial);
+        historial.forEach(dato => {
+            const nodo = "nodo" + dato.nodo;
+            if (!datosNodos[nodo]) return;
 
+            const hora = dato.fechaHora.substring(11, 16);
+            datosNodos[nodo].horarios.push(hora);
+            datosNodos[nodo].temperatura.push(dato.temperaturaDS);
+            datosNodos[nodo].puntoRocio.push(dato.puntoRocio);
+        });
+
+        actualizarGrafica();
     } catch (error) {
-        console.error("Error al obtener datos del servidor:", error);
+        console.error("Error obteniendo historial:", error);
     }
 }
 
-function actualizarTarjetas(datos) {
-    const contenedor = document.getElementById("tarjetas-nodos");
-    const nodosKeys = Object.keys(datos);
+function actualizarGrafica() {
+    const nodoSeleccionado = document.getElementById("seleccionNodo").value;
+    const datos = datosNodos[nodoSeleccionado];
 
-    if (nodosKeys.length === 0) {
-        contenedor.innerHTML = `<p class="cargando">Esperando primera lectura de los sensores...</p>`;
-        return;
-    }
-
-    contenedor.innerHTML = "";
-
-    nodosKeys.forEach(nodoId => {
-        const reg = datos[nodoId];
-        const esAlerta = reg.estado && reg.estado.toUpperCase().includes("ALERTA");
-        const claseEstado = esAlerta ? "alerta" : "normal";
-
-        const html = `
-            <div class="tarjeta-nodo ${claseEstado}">
-                <div class="nodo-titulo">Nodo #${reg.nodo} - ${reg.estado}</div>
-                <div class="metricas">
-                    <div><strong>T. DS18B20:</strong> ${reg.temperaturaDS} °C</div>
-                    <div><strong>T. DHT22:</strong> ${reg.temperaturaDHT} °C</div>
-                    <div><strong>Humedad:</strong> ${reg.humedad} %</div>
-                    <div><strong>Punto Rocío:</strong> ${reg.puntoRocio} °C</div>
-                </div>
-                <div style="font-size: 0.75rem; color: #666; margin-top: 10px;">
-                    Última act: ${reg.fechaHora}
-                </div>
-            </div>
-        `;
-        contenedor.innerHTML += html;
-    });
+    graficaTemperatura.data.labels = datos.horarios;
+    graficaTemperatura.data.datasets[0].data = datos.temperatura;
+    graficaTemperatura.data.datasets[1].data = datos.puntoRocio;
+    graficaTemperatura.update();
 }
 
-function actualizarTabla(historial) {
-    const tbody = document.getElementById("tabla-historial");
+// =====================================================
+// ACTUALIZAR DATOS EN TIEMPO REAL
+// =====================================================
+async function actualizarDatos() {
+    try {
+        const respuesta = await fetch(URL_DATOS);
+        const datos = await respuesta.json();
 
-    if (historial.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="cargando">Sin datos registrados aún.</td></tr>`;
-        return;
-    }
-
-    // Mostrar los registros ordenados desde el más reciente arriba
-    const historialInvertido = [...historial].reverse();
-
-    tbody.innerHTML = historialInvertido.map(reg => {
-        const esAlerta = reg.estado && reg.estado.toUpperCase().includes("ALERTA");
-        const badgeClass = esAlerta ? "badge-alerta" : "badge-normal";
-
-        return `
-            <tr>
-                <td>${reg.fechaHora}</td>
-                <td>#${reg.nodo}</td>
-                <td>${reg.medicion}</td>
-                <td>${reg.temperaturaDS} °C</td>
-                <td>${reg.temperaturaDHT} °C</td>
-                <td>${reg.humedad} %</td>
-                <td>${reg.puntoRocio} °C</td>
-                <td><span class="${badgeClass}">${reg.estado}</span></td>
-            </tr>
-        `;
-    }).join("");
-}
-
-function actualizarGrafico(historial) {
-    if (historial.length === 0) return;
-
-    // Ajustar dinámicamente el ancho del canvas: 40px por cada punto (mínimo 600px)
-    const anchoDinamico = Math.max(600, historial.length * 40);
-    const canvas = document.getElementById("graficoTemperatura");
-    canvas.style.width = `${anchoDinamico}px`;
-
-    const etiquetas = historial.map(r => r.fechaHora.split(" ")[1] || r.fechaHora);
-    const tempDS = historial.map(r => r.temperaturaDS);
-    const puntoRocio = historial.map(r => r.puntoRocio);
-
-    if (!grafico) {
-        const ctx = canvas.getContext("2d");
-        grafico = new Chart(ctx, {
-            type: "line",
-            data: {
-                labels: etiquetas,
-                datasets: [
-                    {
-                        label: "Temp. DS18B20 (°C)",
-                        data: tempDS,
-                        borderColor: "#d9534f",
-                        backgroundColor: "rgba(217, 83, 79, 0.1)",
-                        fill: true,
-                        tension: 0.3
-                    },
-                    {
-                        label: "Punto de Rocío (°C)",
-                        data: puntoRocio,
-                        borderColor: "#0275d8",
-                        backgroundColor: "rgba(2, 117, 216, 0.1)",
-                        fill: true,
-                        tension: 0.3
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        ticks: { maxRotation: 45, minRotation: 45 }
-                    },
-                    y: {
-                        title: { display: true, text: "Temperatura (°C)" }
-                    }
-                }
+        [1, 2].forEach(num => {
+            if (datos[num]) {
+                actualizarNodo(num, datos[num]);
+            } else {
+                marcarDesconectado(num);
             }
         });
-    } else {
-        grafico.data.labels = etiquetas;
-        grafico.data.datasets[0].data = tempDS;
-        grafico.data.datasets[1].data = puntoRocio;
-        grafico.update();
+
+        actualizarEstado(datos);
+    } catch (error) {
+        console.error("Error obteniendo datos:", error);
+    }
+}
+
+function actualizarNodo(numeroNodo, dato) {
+    const elConexion = document.getElementById(`nodo${numeroNodo}-conexion`);
+
+    if (dato.conectado === false) {
+        marcarDesconectado(numeroNodo);
+        return;
     }
 
-    // Scroll automático del contenedor hacia la derecha para mostrar la lectura más reciente
-    const contenedorScroll = document.querySelector(".contenedor-grafico");
-    contenedorScroll.scrollLeft = contenedorScroll.scrollWidth;
+    elConexion.className = "conexion conectado";
+    elConexion.querySelector(".texto-conexion").textContent = "Conectado";
+
+    document.getElementById(`nodo${numeroNodo}-temperaturaDS`).textContent = dato.temperaturaDS.toFixed(2) + " °C";
+    document.getElementById(`nodo${numeroNodo}-temperaturaDHT`).textContent = dato.temperaturaDHT.toFixed(2) + " °C";
+    document.getElementById(`nodo${numeroNodo}-humedad`).textContent = dato.humedad.toFixed(2) + " %";
+    document.getElementById(`nodo${numeroNodo}-puntoRocio`).textContent = dato.puntoRocio.toFixed(2) + " °C";
+    document.getElementById(`nodo${numeroNodo}-actualizacion`).textContent = "Última medición: " + dato.fechaHora;
+}
+
+function marcarDesconectado(numeroNodo) {
+    const elConexion = document.getElementById(`nodo${numeroNodo}-conexion`);
+    elConexion.className = "conexion desconectado";
+    elConexion.querySelector(".texto-conexion").textContent = "Desconectado";
+}
+
+function actualizarEstado(datos) {
+    let estado = "NORMAL";
+
+    for (const nodo in datos) {
+        if (datos[nodo].estado && datos[nodo].estado !== "NORMAL") {
+            estado = datos[nodo].estado;
+        }
+    }
+
+    const elementoEstado = document.getElementById("estadoGeneral");
+    const mensajeEstado = document.getElementById("mensajeEstado");
+
+    elementoEstado.textContent = estado;
+
+    if (estado === "NORMAL") {
+        mensajeEstado.textContent = "Sin indicios de helada en este momento.";
+    } else {
+        mensajeEstado.textContent = "Se ha detectado una condición de posible helada.";
+    }
+}
+
+// =====================================================
+// INICIALIZACIÓN Y EVENTOS
+// =====================================================
+document.getElementById("seleccionNodo").addEventListener("change", actualizarGrafica);
+
+actualizarDatos();
+actualizarHistorial();
+
+setInterval(actualizarDatos, 2000);
+setInterval(actualizarHistorial, 5000);
+
+// =====================================================
+// LÓGICA DEL MAPA DESPLEGABLE
+// =====================================================
+// Coordenadas reales
+const coordenadasNodo1 = [-38.845769, -68.071461]; // Manzana 1
+const coordenadasNodo2 = [-38.845947, -68.071986]; // Ciruela 1
+
+let mapaInicializado = false;
+let mapa;
+
+function inicializarMapa() {
+    if (mapaInicializado) return;
+
+    mapa = L.map('mapa').setView(coordenadasNodo1, 18);
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS'
+    }).addTo(mapa);
+
+    const marcadorNodo1 = L.marker(coordenadasNodo1).addTo(mapa)
+        .bindPopup('<b>Nodo 1</b><br>Manzana 1');
+
+    const marcadorNodo2 = L.marker(coordenadasNodo2).addTo(mapa)
+        .bindPopup('<b>Nodo 2</b><br>Ciruela 1');
+
+    const grupoNodos = L.featureGroup([marcadorNodo1, marcadorNodo2]);
+    mapa.fitBounds(grupoNodos.getBounds().pad(0.4));
+
+    mapaInicializado = true;
+}
+
+const desplegableMapa = document.getElementById('desplegableMapa');
+
+if (desplegableMapa) {
+    desplegableMapa.addEventListener('toggle', function() {
+        if (desplegableMapa.open) {
+            inicializarMapa();
+            setTimeout(() => {
+                if (mapa) mapa.invalidateSize();
+            }, 100);
+        }
+    });
 }
