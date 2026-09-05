@@ -4,19 +4,25 @@ import time
 from datetime import datetime
 from flask import Flask, jsonify, send_from_directory
 
-# Se intenta importar pyserial sin romper la app en servidores sin puerto COM
+# Intentar importar librerías requeridas sin romper el entorno si faltan
 try:
     import serial
 except ImportError:
     serial = None
 
+try:
+    import requests
+except ImportError:
+    requests = None
+
 
 # =====================================================
-# CONFIGURACIÓN
+# CONFIGURACIÓN LOCAL
 # =====================================================
 
 PUERTO = "COM3"
 BAUDRATE = 115200
+URL_RENDER = "https://monitoreo-heladas.onrender.com/api/medicion"
 
 
 # =====================================================
@@ -27,7 +33,7 @@ app = Flask(__name__)
 
 
 # =====================================================
-# VARIABLES DE DATOS
+# VARIABLES DE DATOS EN MEMORIA
 # =====================================================
 
 datos_actuales = {}
@@ -35,7 +41,7 @@ historial = []
 
 
 # =====================================================
-# LECTURA DEL ESP32 (PUERTO SERIE)
+# LECTURA DEL ESP32 (PUERTO SERIE) Y REENVÍO A LA NUBE
 # =====================================================
 
 def leer_esp32():
@@ -43,12 +49,12 @@ def leer_esp32():
     global historial
 
     if serial is None:
-        print("⚠ Librería 'pyserial' no disponible o entorno sin puerto COM.")
+        print("⚠ Librería 'pyserial' no disponible.")
         return
 
     while True:
         try:
-            print("Intentando conectar con", PUERTO)
+            print(f"Intentando conectar con {PUERTO}...")
 
             esp32 = serial.Serial(
                 PUERTO,
@@ -56,8 +62,8 @@ def leer_esp32():
                 timeout=1
             )
 
-            print("ESP32 conectado en:", PUERTO)
-            print("Esperando datos...\n")
+            print(f"ESP32 conectado exitosamente en: {PUERTO}")
+            print("Esperando recepción de datos...\n")
 
             while True:
                 linea = (
@@ -69,7 +75,7 @@ def leer_esp32():
                 if not linea:
                     continue
 
-                # BUSCAR PAQUETE DE DATOS
+                # BUSCAR PAQUETE DE DATOS QUE COMIENCE CON "DATOS:"
                 if linea.startswith("DATOS:"):
                     datos = linea.replace("DATOS:", "").strip()
                     valores = datos.split(",")
@@ -84,6 +90,7 @@ def leer_esp32():
                             punto_rocio = float(valores[5])
                             estado = valores[6]
 
+                            # Fecha y hora tomadas del sistema local
                             fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                             registro = {
@@ -97,9 +104,11 @@ def leer_esp32():
                                 "estado": estado
                             }
 
+                            # Guardar en memoria local
                             datos_actuales[nodo] = registro
                             historial.append(registro)
 
+                            # Mostrar en la consola local
                             print(
                                 "Nodo:", nodo,
                                 "| Medición:", medicion,
@@ -108,12 +117,25 @@ def leer_esp32():
                                 "| Td:", punto_rocio, "°C"
                             )
 
+                            # REENVIAR A LA NUBE (RENDER)
+                            if requests is not None:
+                                try:
+                                    res = requests.post(URL_RENDER, json=registro, timeout=3)
+                                    if res.status_code == 200:
+                                        print("   └─> Datos enviados con éxito a Render")
+                                    else:
+                                        print(f"   └─> Render devolvió código: {res.status_code}")
+                                except Exception as err_net:
+                                    print(f"   └─> Error de red al enviar a Render: {err_net}")
+                            else:
+                                print("   └─> No se envió a Render (falta instalar 'requests')")
+
                         except ValueError:
-                            print("Error al interpretar los datos recibidos.")
+                            print("Error al interpretar los tipos de datos recibidos.")
 
         except Exception as e:
-            print(f"\n⚠ No se pudo conectar al puerto {PUERTO}: {e}")
-            print("Esperando reconexión en 5 segundos...\n")
+            print(f"\n⚠ No se pudo acceder al puerto {PUERTO}: {e}")
+            print("Reintentando conexión en 5 segundos...\n")
             time.sleep(5)
 
 
@@ -155,7 +177,6 @@ def obtener_historial():
     return jsonify(historial)
 
 
-# Ruta opcional para recibir datos por HTTP POST directamente desde los ESP32 vía Wi-Fi
 @app.route("/api/medicion", methods=["POST"])
 def recibir_medicion():
     from flask import request
@@ -163,7 +184,10 @@ def recibir_medicion():
         data = request.get_json()
         nodo = int(data.get("nodo"))
         
-        data["fechaHora"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Si la petición no especifica hora, Render la asigna según su zona horaria
+        if "fechaHora" not in data or not data["fechaHora"]:
+            data["fechaHora"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
         datos_actuales[nodo] = data
         historial.append(data)
         
@@ -182,13 +206,13 @@ if __name__ == "__main__":
     hilo = threading.Thread(target=leer_esp32, daemon=True)
     hilo.start()
 
-    # Tomar el puerto asignado por Render o usar el 5000 por defecto en local
+    # Tomar el puerto asignado por Render o usar el 5000 por defecto
     port = int(os.environ.get("PORT", 5000))
 
     print("\n========================================")
     print("      SERVIDOR WEB - MONITOREO")
     print("========================================\n")
-    print(f"Servidor iniciado en el puerto: {port}")
+    print(f"Servidor corriendo en el puerto: {port}")
     print("========================================\n")
 
     app.run(
