@@ -40,7 +40,7 @@ const graficaTemperatura = new Chart(ctx, {
         ]
     },
     options: {
-        responsive: true,
+        responsive: false, // Permite que el canvas supere el ancho del contenedor y active el scroll
         maintainAspectRatio: false,
         scales: {
             y: { title: { display: true, text: "Temperatura (°C)" } },
@@ -80,12 +80,15 @@ function actualizarGrafica() {
     const nodoSeleccionado = document.getElementById("seleccionNodo").value;
     const datos = datosNodos[nodoSeleccionado];
 
-    // Calcula el ancho expandido para que aparezca la barra al acumular lecturas
+    const canvasGrafico = document.getElementById("graficaTemperatura");
     const contenedorScroll = document.querySelector(".contenedor-grafico-scroll");
-    if (contenedorScroll && datos.horarios.length > 0) {
-        // Se otorgan 35px por cada medición registrada en el historial (mínimo 800px)
-        const anchoDinamico = Math.max(800, datos.horarios.length * 35);
-        ctx.style.width = `${anchoDinamico}px`;
+
+    if (canvasGrafico && datos.horarios.length > 0) {
+        // Se calculan 40px por cada punto de medición para mantener la holgura (mínimo 900px)
+        const anchoCalculado = Math.max(900, datos.horarios.length * 40);
+        
+        canvasGrafico.style.width = `${anchoCalculado}px`;
+        canvasGrafico.width = anchoCalculado; // Ajusta la resolución interna de Chart.js
     }
 
     graficaTemperatura.data.labels = datos.horarios;
@@ -93,7 +96,7 @@ function actualizarGrafica() {
     graficaTemperatura.data.datasets[1].data = datos.puntoRocio;
     graficaTemperatura.update();
 
-    // Desplaza la barra automáticamente hacia la derecha para mostrar la lectura más reciente
+    // Mueve la barra de scroll automáticamente hacia el dato más reciente
     if (contenedorScroll) {
         contenedorScroll.scrollLeft = contenedorScroll.scrollWidth;
     }
