@@ -101,7 +101,8 @@ def leer_esp32():
                                 "temperaturaDHT": temperatura_dht,
                                 "humedad": humedad,
                                 "puntoRocio": punto_rocio,
-                                "estado": estado
+                                "estado": estado,
+                                "conectado": True
                             }
 
                             # Guardar en memoria local
@@ -110,11 +111,9 @@ def leer_esp32():
 
                             # Mostrar en la consola local
                             print(
-                                "Nodo:", nodo,
-                                "| Medición:", medicion,
-                                "| T:", temperatura_ds, "°C",
-                                "| HR:", humedad, "%",
-                                "| Td:", punto_rocio, "°C"
+                                f"Nodo: {nodo} | Medición: {medicion} | "
+                                f"T.DS: {temperatura_ds}°C | T.DHT: {temperatura_dht}°C | "
+                                f"HR: {humedad}% | Td: {punto_rocio}°C | Estado: {estado}"
                             )
 
                             # REENVIAR A LA NUBE (RENDER)
@@ -184,7 +183,6 @@ def recibir_medicion():
         data = request.get_json()
         nodo = int(data.get("nodo"))
         
-        # Si la petición no especifica hora, Render la asigna según su zona horaria
         if "fechaHora" not in data or not data["fechaHora"]:
             data["fechaHora"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 

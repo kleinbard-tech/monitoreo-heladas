@@ -433,7 +433,7 @@ body {
 
 
 /* =====================================================
-   GRÁFICA
+   GRÁFICA DE HISTORIAL Y SCROLL
    ===================================================== */
 
 .grafica,
@@ -483,6 +483,21 @@ body {
     height: 320px;
 
     position: relative;
+}
+
+/* Permite el scroll horizontal en la gráfica sin alterar la caja */
+.contenedor-grafico-scroll {
+    width: 100%;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Ancho mínimo responsivo para generar la barra al acumular puntos */
+.contenedor-grafico-scroll canvas {
+    min-width: 650px;
+    height: 100% !important;
 }
 
 
