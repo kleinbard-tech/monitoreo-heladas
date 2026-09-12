@@ -1,27 +1,25 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Monitoreo Microclimático y Alerta Temprana de Heladas</title>
-
-    <!-- CSS de Leaflet para el mapa satelital -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-
-    <!-- Estilos propios -->
+    
+    <!-- Hoja de estilos principal -->
     <link rel="stylesheet" href="estilo.css">
-</head>
 
+    <!-- Leaflet CSS para el Mapa -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+    <!-- Chart.js para las gráficas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
 <body>
 
     <!-- =====================================================
          ENCABEZADO INSTITUCIONAL
          ===================================================== -->
-
     <header class="encabezado">
-
         <div class="header-institucional">
 
             <!-- LOGO PRINCIPAL DE LA UNIVERSIDAD ARRIBA -->
@@ -48,367 +46,157 @@
 
         </div>
 
-
         <div class="header-contenido">
-
-            <div class="header-badge">
-                Proyecto Integrador Profesional
-            </div>
-
-            <h1>
-                Monitoreo Microclimático y Alerta Temprana de Heladas
-            </h1>
-
-            <div class="header-autor">
-
-                <span>
-                    Desarrollado por:
-                </span>
-
-                <strong>
-                    Matías Ezequiel Kleinbard
-                </strong>
-
-            </div>
-
+            <span class="header-badge">Proyecto Integrador Profesional</span>
+            <h1>Monitoreo Microclimático y Alerta Temprana de Heladas</h1>
+            <p class="header-autor">Desarrollado por: <strong>Matías Ezequiel Kleinbard</strong></p>
         </div>
-
     </header>
-
-
 
     <!-- =====================================================
          CONTENIDO PRINCIPAL
          ===================================================== -->
-
     <main class="contenedor">
 
-
-        <!-- =================================================
-             1. ESTADO AMBIENTAL GENERAL
-             ================================================= -->
-
+        <!-- 1. ESTADO GENERAL -->
         <section class="estado-general">
-
-            <h2>
-                Estado ambiental
-            </h2>
-
-            <p class="estado-normal" id="estadoGeneral">
-                Condición normal
-            </p>
-
-            <p id="mensajeEstado">
-                Sin indicios de helada en este momento.
-            </p>
-
+            <h2>Estado Ambiental</h2>
+            <div id="estadoGeneral" class="estado-normal">NORMAL</div>
+            <p id="mensajeEstado">Sin indicios de helada en este momento.</p>
         </section>
 
-
-
-        <!-- =================================================
-             2. INFORMACIÓN DE LOS NODOS
-             ================================================= -->
-
+        <!-- 2. TARJETAS DE NODOS -->
         <section class="nodos">
 
-
-        <!-- =========================
-                 NODO 1
-                 ========================= -->
-
+            <!-- NODO 1 -->
             <div class="nodo">
-
                 <div class="nodo-header">
-
                     <h2>
                         Nodo 1 
                         <span style="display: block; font-size: 11px; color: #64748b; font-weight: 500; margin-top: 2px;">
                             Chacra Experimental FACA (Manzana 1)
                         </span>
                     </h2>
-
-                    <p class="conexion conectado" id="nodo1-conexion">
-
+                    <p class="conexion desconectado" id="nodo1-conexion">
                         <span class="indicador"></span>
-
-                        <span class="texto-conexion">
-                            Conectado
-                        </span>
-
+                        <span class="texto-conexion">Desconectado</span>
                     </p>
-
                 </div>
-
-
                 <div class="datos">
-
-
-                    <!-- Temperatura DS18B20 -->
-
                     <div class="dato dato-principal">
-
-                        <span class="etiqueta">
-                            Temperatura DS18B20
-                        </span>
-
-                        <span class="valor" id="nodo1-temperaturaDS">
-                            -- °C
-                        </span>
-
+                        <span class="etiqueta">Temperatura DS18B20</span>
+                        <span class="valor" id="nodo1-temperaturaDS">-- °C</span>
                     </div>
-
-
-                    <!-- Temperatura DHT22 -->
-
                     <div class="dato">
-
-                        <span class="etiqueta">
-                            Temperatura DHT22
-                        </span>
-
-                        <span class="valor" id="nodo1-temperaturaDHT">
-                            -- °C
-                        </span>
-
+                        <span class="etiqueta">Temperatura DHT22</span>
+                        <span class="valor" id="nodo1-temperaturaDHT">-- °C</span>
                     </div>
-
-
-                    <!-- Humedad -->
-
                     <div class="dato">
-
-                        <span class="etiqueta">
-                            Humedad relativa
-                        </span>
-
-                        <span class="valor" id="nodo1-humedad">
-                            -- %
-                        </span>
-
+                        <span class="etiqueta">Humedad relativa</span>
+                        <span class="valor" id="nodo1-humedad">-- %</span>
                     </div>
-
-
-                    <!-- Punto de rocío -->
-
                     <div class="dato">
-
-                        <span class="etiqueta">
-                            Punto de rocío
-                        </span>
-
-                        <span class="valor" id="nodo1-puntoRocio">
-                            -- °C
-                        </span>
-
+                        <span class="etiqueta">Punto de rocío</span>
+                        <span class="valor" id="nodo1-puntoRocio">-- °C</span>
                     </div>
-
                 </div>
-
-
-                <p class="actualizacion" id="nodo1-actualizacion">
-                    Última medición: --
-                </p>
-
+                <div class="actualizacion" id="nodo1-actualizacion">Sin datos recientes</div>
             </div>
 
-
-
-            <!-- =========================
-                 NODO 2
-                 ========================= -->
-
+            <!-- NODO 2 -->
             <div class="nodo">
-
                 <div class="nodo-header">
-
                     <h2>
                         Nodo 2 
                         <span style="display: block; font-size: 11px; color: #64748b; font-weight: 500; margin-top: 2px;">
                             Chacra Experimental FACA (Ciruela 1)
                         </span>
                     </h2>
-
                     <p class="conexion desconectado" id="nodo2-conexion">
-
                         <span class="indicador"></span>
-
-                        <span class="texto-conexion">
-                            Desconectado
-                        </span>
-
+                        <span class="texto-conexion">Desconectado</span>
                     </p>
-
                 </div>
-
                 <div class="datos">
-
-
-                    <!-- Temperatura DS18B20 -->
-
                     <div class="dato dato-principal">
-
-                        <span class="etiqueta">
-                            Temperatura DS18B20
-                        </span>
-
-                        <span class="valor" id="nodo2-temperaturaDS">
-                            -- °C
-                        </span>
-
+                        <span class="etiqueta">Temperatura DS18B20</span>
+                        <span class="valor" id="nodo2-temperaturaDS">-- °C</span>
                     </div>
-
-
-                    <!-- Temperatura DHT22 -->
-
                     <div class="dato">
-
-                        <span class="etiqueta">
-                            Temperatura DHT22
-                        </span>
-
-                        <span class="valor" id="nodo2-temperaturaDHT">
-                            -- °C
-                        </span>
-
+                        <span class="etiqueta">Temperatura DHT22</span>
+                        <span class="valor" id="nodo2-temperaturaDHT">-- °C</span>
                     </div>
-
-
-                    <!-- Humedad -->
-
                     <div class="dato">
-
-                        <span class="etiqueta">
-                            Humedad relativa
-                        </span>
-
-                        <span class="valor" id="nodo2-humedad">
-                            -- %
-                        </span>
-
+                        <span class="etiqueta">Humedad relativa</span>
+                        <span class="valor" id="nodo2-humedad">-- %</span>
                     </div>
-
-
-                    <!-- Punto de rocío -->
-
                     <div class="dato">
-
-                        <span class="etiqueta">
-                            Punto de rocío
-                        </span>
-
-                        <span class="valor" id="nodo2-puntoRocio">
-                            -- °C
-                        </span>
-
+                        <span class="etiqueta">Punto de rocío</span>
+                        <span class="valor" id="nodo2-puntoRocio">-- °C</span>
                     </div>
-
                 </div>
-
-
-                <p class="actualizacion" id="nodo2-actualizacion">
-                    Última medición: --
-                </p>
-
+                <div class="actualizacion" id="nodo2-actualizacion">Sin datos recientes</div>
             </div>
 
         </section>
 
-
-
-        <!-- =================================================
-             3. GRÁFICA DE HISTORIAL
-             ================================================= -->
-
+        <!-- 3. GRÁFICA DE TEMPERATURA -->
         <section class="grafica">
-
             <div class="grafica-header">
-
-                <h2>
-                    Temperatura y punto de rocío
-                </h2>
-
-
+                <h2>Comportamiento Histórico de Temperatura y Rocío</h2>
                 <div class="selector-nodo">
-
-                    <label for="seleccionNodo">
-                        Mostrar datos de:
-                    </label>
-
+                    <label for="seleccionNodo">Nodo:</label>
                     <select id="seleccionNodo">
-
-                        <option value="nodo1">
-                            Nodo 1
-                        </option>
-
-                        <option value="nodo2">
-                            Nodo 2
-                        </option>
-
+                        <option value="nodo1">Nodo 1 (Manzana 1)</option>
+                        <option value="nodo2">Nodo 2 (Ciruela 1)</option>
                     </select>
-
                 </div>
-
             </div>
-
-
             <div class="area-grafica">
-
                 <div class="contenedor-grafico-scroll">
-
                     <canvas id="graficaTemperatura"></canvas>
-
                 </div>
-
             </div>
-
         </section>
 
-
-
-        <!-- =================================================
-             4. SECCIÓN DESPLEGABLE DE MAPA
-             ================================================= -->
-
+        <!-- 4. MAPA GEOGRÁFICO DESPLEGABLE -->
         <section class="mapa-seccion">
-
             <details id="desplegableMapa">
-
                 <summary class="mapa-header">
-
-                    <h2>
-                        Ver Ubicación Geográfica de los Nodos
-                    </h2>
-
-                    <span class="icono-desplegar">
-                        ▼
-                    </span>
-
+                    <h2>Ver Ubicación Geográfica de los Nodos</h2>
+                    <span class="icono-desplegar">▼</span>
                 </summary>
-
-
                 <div class="mapa-contenido">
-
                     <div id="mapa"></div>
-
                 </div>
-
             </details>
+        </section>
 
+        <!-- 5. HISTÓRICOS MENSUALES CSV DESPLEGABLE -->
+        <section class="mapa-seccion">
+            <details id="desplegableHistorial">
+                <summary class="mapa-header">
+                    <h2>📁 Descarga de Registros Históricos Mensuales (CSV)</h2>
+                    <span class="icono-desplegar">▼</span>
+                </summary>
+                <div class="mapa-contenido" style="color: #1e293b; background-color: #ffffff; padding: 20px;">
+                    <p style="font-size: 14px; margin-bottom: 12px; color: #475569;">
+                        Aquí podés descargar los archivos consolidados con las mediciones históricas de la Chacra Experimental FACA mes a mes:
+                    </p>
+                    <ul id="listaArchivosCsv" style="list-style-type: none; padding: 0; display: flex; flex-direction: column; gap: 8px;">
+                        <li>Cargando registros disponibles...</li>
+                    </ul>
+                </div>
+            </details>
         </section>
 
     </main>
 
-
-
     <!-- =====================================================
          PIE DE PÁGINA
          ===================================================== -->
-
-   <footer class="pie-pagina">
-
+    <footer class="pie-pagina">
         <div class="footer-contenido">
-
             <div class="logo-principal-container">
                 <img src="logo-unco.jpg" alt="Logo de la UNCo" class="logo-unco-principal-footer">
             </div>
@@ -431,31 +219,13 @@
             <p class="footer-subtexto-proyecto">
                 Proyecto Integrador Profesional — Monitoreo Microclimático y Alerta Temprana de Heladas
             </p>
-
         </div>
-
     </footer>
 
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-
-    <!-- =====================================================
-         LIBRERÍAS Y SCRIPTS
-         ===================================================== -->
-
-    <!-- Chart.js -->
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-
-    <!-- Leaflet -->
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-
-    <!-- JavaScript propio -->
-
+    <!-- Script principal de la aplicación -->
     <script src="script.js"></script>
-
 </body>
-
 </html>
