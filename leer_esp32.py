@@ -1,3 +1,4 @@
+import csv
 import os
 import threading
 import time
@@ -38,6 +39,45 @@ app = Flask(__name__)
 
 datos_actuales = {}
 historial = []
+
+
+# =====================================================
+# FUNCIÓN PARA GUARDAR HISTORIAL MENSUAL EN CSV
+# =====================================================
+
+def guardar_en_csv(registro):
+    try:
+        if not os.path.exists("registros"):
+            os.makedirs("registros")
+        
+        # Extraer año y mes (ej: "2026-09" a partir de "2026-09-12 19:52:00")
+        solo_fecha = registro["fechaHora"].split(" ")[0]
+        anio_mes = solo_fecha[:7]
+        
+        nombre_archivo = f"registros/historial_{anio_mes}.csv"
+        archivo_existe = os.path.exists(nombre_archivo)
+        
+        with open(nombre_archivo, mode="a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            if not archivo_existe:
+                writer.writerow([
+                    "FechaHora", "Nodo", "Medicion", 
+                    "TemperaturaDS", "TemperaturaDHT", 
+                    "Humedad", "PuntoRocio", "Estado"
+                ])
+            
+            writer.writerow([
+                registro["fechaHora"],
+                registro["nodo"],
+                registro["medicion"],
+                registro["temperaturaDS"],
+                registro["temperaturaDHT"],
+                registro["humedad"],
+                registro["puntoRocio"],
+                registro["estado"]
+            ])
+    except Exception as e:
+        print(f"⚠ Error al guardar en CSV: {e}")
 
 
 # =====================================================
@@ -105,9 +145,10 @@ def leer_esp32():
                                 "conectado": True
                             }
 
-                            # Guardar en memoria local
+                            # Guardar en memoria local y en archivo CSV mensual
                             datos_actuales[nodo] = registro
                             historial.append(registro)
+                            guardar_en_csv(registro)
 
                             # Mostrar en la consola local
                             print(
@@ -173,7 +214,7 @@ def logo_faca():
 
 
 # =====================================================
-# RUTAS DE LA API (DATOS E HISTORIAL)
+# RUTAS DE LA API (DATOS, HISTORIAL Y DESCARGA CSV)
 # =====================================================
 
 @app.route("/datos", methods=["GET"])
@@ -184,6 +225,21 @@ def obtener_datos():
 @app.route("/historial", methods=["GET"])
 def obtener_historial():
     return jsonify(historial)
+
+
+@app.route("/api/archivos-csv", methods=["GET"])
+def listar_archivos_csv():
+    if not os.path.exists("registros"):
+        return jsonify([])
+    
+    archivos = sorted(os.listdir("registros"), reverse=True)
+    lista_csv = [f for f in archivos if f.endswith(".csv")]
+    return jsonify(lista_csv)
+
+
+@app.route("/descargar/<nombre_archivo>")
+def descargar_csv(nombre_archivo):
+    return send_from_directory("registros", nombre_archivo, as_attachment=True)
 
 
 @app.route("/api/medicion", methods=["POST"])
@@ -198,6 +254,9 @@ def recibir_medicion():
 
         datos_actuales[nodo] = data
         historial.append(data)
+        
+        # Guardar también cuando recibe por POST en Render
+        guardar_en_csv(data)
         
         return jsonify({"status": "ok", "message": "Datos recibidos correctamente"}), 200
     except Exception as e:
