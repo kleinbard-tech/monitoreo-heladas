@@ -46,16 +46,23 @@ body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.logo-unco,
-.logo-unco-footer {
-    width: 48px;
-    height: 48px;
+/* CONTENEDOR Y ESTILO DE LOS TRES LOGOS */
+.logos-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.logo-institucional,
+.logo-institucional-footer {
+    width: 40px;
+    height: 40px;
     object-fit: cover;
     border-radius: 50%;
     background-color: white;
     padding: 2px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    flex-shrink: 0;
 }
 
 .texto-institucional {
@@ -94,12 +101,12 @@ body {
 }
 
 .encabezado h1 {
-    font-size: 28px; /* Ligeramente más compacto para títulos largos */
+    font-size: 28px;
     font-weight: 700;
     letter-spacing: -0.5px;
-    line-height: 1.2; /* Asegura un buen interlineado si baja a dos renglones */
+    line-height: 1.2;
     margin: 0 auto;
-    max-width: 900px; /* Evita que se estire demasiado a lo ancho */
+    max-width: 900px;
     color: #f8fafc;
 }
 
@@ -384,7 +391,7 @@ details[open] .icono-desplegar {
 @media (max-width: 600px) {
     .encabezado { padding: 20px 15px 25px; }
     .header-institucional { gap: 10px; }
-    .logo-unco, .logo-unco-footer { width: 40px; height: 40px; }
+    .logo-institucional, .logo-institucional-footer { width: 32px; height: 32px; }
     .texto-institucional { text-align: left; }
     .texto-institucional span { font-size: 9px; letter-spacing: 1px; }
     .texto-institucional strong { font-size: 13px; }
