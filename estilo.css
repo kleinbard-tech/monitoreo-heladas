@@ -1,39 +1,30 @@
-:root {
-    --bg-main: #f0f2f5;
-    --card-bg: #ffffff;
-    --text-primary: #1f2937;
-    --text-secondary: #6b7280;
-    --primary-color: #2563eb;
-    --border-color: #e5e7eb;
-
-    --status-online: #16a34a;
-    --status-online-bg: #dcfce7;
-    --status-offline: #dc2626;
-    --status-offline-bg: #fee2e2;
-}
-
+/* =====================================================
+   ESTILOS GENERALES Y RESET
+   ===================================================== */
 * {
-    box-sizing: border-box;
     margin: 0;
     padding: 0;
+    box-sizing: border-box;
 }
 
 body {
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    background-color: var(--bg-main);
-    color: var(--text-primary);
-    line-height: 1.5;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #0f172a;
+    color: #f8fafc;
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
 }
 
-/* ENCABEZADO INSTITUCIONAL */
+/* =====================================================
+   ENCABEZADO INSTITUCIONAL
+   ===================================================== */
 .encabezado {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-    color: white;
-    padding: 24px 20px 30px;
-    text-align: center;
-    position: relative;
-    border-bottom: 3px solid var(--primary-color);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    background-color: #1e293b;
+    padding: 20px 20px 15px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 .header-institucional {
@@ -41,297 +32,331 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 12px;
-    padding-bottom: 18px;
-    margin-bottom: 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 15px;
+    margin-bottom: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     text-align: center;
 }
 
-.texto-institucional {
+.logo-principal-container {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    line-height: 1.4;
+    justify-content: center;
+}
+
+.logo-unco-principal,
+.logo-unco-principal-footer {
+    width: 52px;
+    height: 52px;
+    object-fit: cover;
+    border-radius: 50%;
+    background-color: white;
+    padding: 2px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .univ-principal {
-    font-size: 16px;
+    font-size: 17px;
     color: #f8fafc;
     font-weight: 700;
     letter-spacing: 0.5px;
 }
 
-.facu-sub {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #94a3b8;
-    margin-top: 2px;
-}
-
-/* CONTENEDOR Y ESTILO DE LOS TRES LOGOS */
-.logos-container {
+/* GRILLA PARA LAS DOS FACULTADES ABAJO */
+.facultades-grid {
     display: flex;
-    align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: 35px;
+    margin-top: 4px;
     flex-wrap: wrap;
-    flex-shrink: 0;
 }
 
-.logo-institucional,
-.logo-institucional-footer {
-    width: 42px;
-    height: 42px;
+.facultad-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.logo-facu,
+.logo-facu-footer {
+    width: 38px;
+    height: 38px;
     object-fit: cover;
     border-radius: 50%;
     background-color: white;
     padding: 2px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.nombre-facu,
+.nombre-facu-footer {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+.header-contenido {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
 }
 
 .header-badge {
-    display: inline-block;
-    background: rgba(37, 99, 235, 0.15);
-    color: #60a5fa;
-    border: 1px solid rgba(96, 165, 250, 0.3);
-    padding: 4px 14px;
-    border-radius: 20px;
+    background-color: #0284c7;
+    color: white;
     font-size: 12px;
     font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
     text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin-bottom: 12px;
 }
 
-.encabezado h1 {
-    font-size: 28px;
+.header-contenido h1 {
+    font-size: 22px;
     font-weight: 700;
-    letter-spacing: -0.5px;
-    line-height: 1.2;
-    margin: 0 auto;
-    max-width: 900px;
-    color: #f8fafc;
+    color: #ffffff;
 }
 
 .header-autor {
-    margin-top: 10px;
-    font-size: 14px;
+    font-size: 13px;
     color: #94a3b8;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 6px;
 }
 
 .header-autor strong {
     color: #e2e8f0;
-    font-weight: 600;
-    letter-spacing: 0.3px;
 }
 
-/* CONTENEDOR PRINCIPAL */
+/* =====================================================
+   CONTENIDO PRINCIPAL
+   ===================================================== */
 .contenedor {
-    width: 92%;
-    max-width: 1200px;
-    margin: 30px auto;
+    max-width: 1100px;
+    width: 100%;
+    margin: 20px auto;
+    padding: 0 20px;
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 25px;
 }
 
-/* NODOS */
+/* 1. ESTADO GENERAL */
+.estado-general {
+    background-color: #1e293b;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.estado-general h2 {
+    font-size: 18px;
+    color: #94a3b8;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.estado-normal {
+    font-size: 24px;
+    font-weight: 700;
+    color: #22c55e;
+    margin-bottom: 6px;
+}
+
+#mensajeEstado {
+    font-size: 14px;
+    color: #cbd5e1;
+}
+
+/* 2. NODOS */
 .nodos {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 20px;
 }
 
 .nodo {
-    background: var(--card-bg);
+    background-color: #1e293b;
     border-radius: 12px;
-    padding: 24px;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    padding: 20px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }
 
 .nodo-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 10px;
 }
 
-.nodo h2 {
-    font-size: 18px;
+.nodo-header h2 {
+    font-size: 16px;
     font-weight: 600;
+    color: #f8fafc;
 }
 
 .conexion {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 12px;
 }
 
 .conexion.conectado {
-    background-color: var(--status-online-bg);
-    color: var(--status-online);
+    background-color: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
 }
 
 .conexion.desconectado {
-    background-color: var(--status-offline-bg);
-    color: var(--status-offline);
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
 }
 
 .indicador {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-}
-
-.conectado .indicador {
-    background-color: var(--status-online);
-}
-
-.desconectado .indicador {
-    background-color: var(--status-offline);
+    background-color: currentColor;
 }
 
 .datos {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
 }
 
 .dato {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.dato:last-child {
-    border-bottom: none;
-}
-
-.etiqueta {
-    font-size: 14px;
-    color: var(--text-secondary);
-}
-
-.valor {
-    font-size: 18px;
-    font-weight: 600;
+    background-color: #0f172a;
+    padding: 10px 14px;
+    border-radius: 8px;
 }
 
 .dato-principal {
-    background: #f8fafc;
-    padding: 12px;
-    border-radius: 8px;
-    border-bottom: none;
+    border-left: 4px solid #0284c7;
 }
 
-.dato-principal .valor {
-    font-size: 24px;
-    color: var(--primary-color);
+.etiqueta {
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+.valor {
+    font-size: 16px;
+    font-weight: 700;
+    color: #f8fafc;
 }
 
 .actualizacion {
-    margin-top: 15px;
-    font-size: 12px;
-    color: var(--text-secondary);
+    font-size: 11px;
+    color: #64748b;
     text-align: right;
 }
 
-/* GRÁFICA DE HISTORIAL CON SCROLL PERFECTO */
-.grafica,
-.estado-general {
-    background: var(--card-bg);
+/* 3. GRÁFICA */
+.grafica {
+    background-color: #1e293b;
     border-radius: 12px;
-    padding: 24px;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    padding: 20px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 .grafica-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.grafica-header h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #f8fafc;
+}
+
+.selector-nodo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #94a3b8;
 }
 
 .selector-nodo select {
-    padding: 6px 12px;
+    background-color: #0f172a;
+    color: #f8fafc;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 5px 10px;
     border-radius: 6px;
-    border: 1px solid var(--border-color);
-    background-color: white;
-    font-size: 14px;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
 }
 
 .area-grafica {
-    width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
     position: relative;
+    width: 100%;
+    height: 300px;
 }
 
 .contenedor-grafico-scroll {
-    position: relative;
-    height: 320px;
-    min-width: 100%;
+    width: 100%;
+    height: 100%;
 }
 
-.contenedor-grafico-scroll canvas {
-    width: 100% !important;
-    height: 100% !important;
-}
-
-/* MAPA */
+/* 4. MAPA */
 .mapa-seccion {
-    background: var(--card-bg);
+    background-color: #1e293b;
     border-radius: 12px;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-details.mapa-seccion summary {
-    list-style: none;
-}
-
-details.mapa-seccion summary::-webkit-details-marker {
-    display: none;
+.mapa-seccion details {
+    width: 100%;
 }
 
 .mapa-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 18px 24px;
+    padding: 15px 20px;
     cursor: pointer;
     user-select: none;
-    transition: background-color 0.2s ease;
+    background-color: #1e293b;
+    transition: background-color 0.2s;
 }
 
 .mapa-header:hover {
-    background-color: #f8fafc;
+    background-color: #334155;
 }
 
 .mapa-header h2 {
-    font-size: 18px;
+    font-size: 15px;
     font-weight: 600;
-    margin: 0;
+    color: #f8fafc;
 }
 
 .icono-desplegar {
     font-size: 12px;
-    color: var(--text-secondary);
+    color: #94a3b8;
     transition: transform 0.3s ease;
 }
 
@@ -340,41 +365,30 @@ details[open] .icono-desplegar {
 }
 
 .mapa-contenido {
-    padding: 0 24px 24px 24px;
+    padding: 15px;
+    background-color: #0f172a;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 #mapa {
-    height: 350px;
     width: 100%;
+    height: 350px;
     border-radius: 8px;
-    border: 1px solid var(--border-color);
     z-index: 1;
 }
 
-/* ESTADO GENERAL */
-.estado-general {
-    text-align: center;
-}
-
-.estado-normal {
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--status-online);
-    margin: 10px 0 5px;
-}
-
-/* PIE DE PÁGINA */
+/* =====================================================
+   PIE DE PÁGINA
+   ===================================================== */
 .pie-pagina {
-    background: #0f172a;
-    color: #94a3b8;
+    background-color: #1e293b;
     padding: 25px 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
     margin-top: 40px;
-    border-top: 1px solid var(--border-color);
-    font-size: 13px;
 }
 
 .footer-contenido {
-    max-width: 1200px;
+    max-width: 1100px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
@@ -387,39 +401,22 @@ details[open] .icono-desplegar {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
 }
 
-.pie-pagina strong {
+.footer-texto-institucional p {
+    font-size: 14px;
     color: #f8fafc;
 }
 
-.footer-subtexto {
-    font-size: 12px;
-    color: #94a3b8;
-}
-
 .footer-subtexto-proyecto {
-    font-size: 11px;
-    color: #64748b;
-    margin-top: 6px;
-}
-
-@media (max-width: 600px) {
-    .encabezado { padding: 20px 15px 25px; }
-    .header-institucional { gap: 10px; }
-    .logo-institucional, .logo-institucional-footer { width: 36px; height: 36px; }
-    .univ-principal { font-size: 14px; }
-    .facu-sub { font-size: 9px; }
-    .encabezado h1 { font-size: 24px; }
-    .header-autor { flex-direction: column; gap: 2px; font-size: 13px; }
-    .nodos { grid-template-columns: 1fr; }
-    .nodo { min-width: 0; }
-    .grafica-header { flex-direction: column; align-items: flex-start; gap: 12px; }
-    .selector-nodo { width: 100%; }
-    .selector-nodo select { width: 100%; }
-    .mapa-header { padding: 16px 18px; }
-    .mapa-header h2 { font-size: 16px; }
-    .mapa-contenido { padding: 0 15px 15px 15px; }
-    #mapa { height: 300px; }
+    font-size: 13px;
+    color: #cbd5e1;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    margin-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 10px;
+    width: 100%;
+    max-width: 600px;
+    text-align: center;
 }
