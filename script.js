@@ -92,7 +92,6 @@ function actualizarGrafica() {
     const areaGrafica = document.querySelector(".area-grafica");
 
     if (contenedorScroll && datos.horarios.length > 0) {
-        // Asigna 35px por medición. Si supera el ancho visible, estira el contenedor.
         const anchoMinimoContainer = areaGrafica.clientWidth;
         const anchoCalculado = Math.max(anchoMinimoContainer, datos.horarios.length * 35);
         contenedorScroll.style.width = `${anchoCalculado}px`;
@@ -102,11 +101,9 @@ function actualizarGrafica() {
     graficaTemperatura.data.datasets[0].data = datos.temperatura;
     graficaTemperatura.data.datasets[1].data = datos.puntoRocio;
     
-    // Forzamos al canvas a re-renderizarse nítido
     graficaTemperatura.resize();
     graficaTemperatura.update();
 
-    // Scroll automático a la derecha (al dato más reciente)
     if (areaGrafica) {
         areaGrafica.scrollLeft = areaGrafica.scrollWidth;
     }
@@ -208,7 +205,7 @@ function inicializarMapa() {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS'
     }).addTo(mapa);
 
-   const marcadorNodo1 = L.marker(coordenadasNodo1).addTo(mapa)
+    const marcadorNodo1 = L.marker(coordenadasNodo1).addTo(mapa)
         .bindPopup('<b>Nodo 1 (Manzana 1)</b><br>Chacra Experimental FACA');
 
     const marcadorNodo2 = L.marker(coordenadasNodo2).addTo(mapa)
@@ -229,6 +226,59 @@ if (desplegableMapa) {
             setTimeout(() => {
                 if (mapa) mapa.invalidateSize();
             }, 100);
+        }
+    });
+}
+
+// =====================================================
+// LÓGICA DEL DESPLEGABLE DE HISTORIAL CSV MENSUAL
+// =====================================================
+const desplegableHistorial = document.getElementById('desplegableHistorial');
+let historialCargado = false;
+
+if (desplegableHistorial) {
+    desplegableHistorial.addEventListener('toggle', async function() {
+        if (desplegableHistorial.open && !historialCargado) {
+            try {
+                const respuesta = await fetch('/api/archivos-csv');
+                const archivos = await respuesta.json();
+                
+                const contenedorLista = document.getElementById('listaArchivosCsv');
+                contenedorLista.innerHTML = '';
+
+                if (archivos.length === 0) {
+                    contenedorLista.innerHTML = '<li>No hay registros mensuales guardados todavía.</li>';
+                    return;
+                }
+
+                archivos.forEach(archivo => {
+                    // Extraer año y mes (ej: historial_2026-09.csv -> 2026 y 09)
+                    const partes = archivo.replace('historial_', '').replace('.csv', '').split('-');
+                    const anio = partes[0];
+                    const mesNum = partes[1];
+                    
+                    const meses = {
+                        "01": "Enero", "02": "Febrero", "03": "Marzo", "04": "Abril",
+                        "05": "Mayo", "06": "Junio", "07": "Julio", "08": "Agosto",
+                        "09": "Septiembre", "10": "Octubre", "11": "Noviembre", "12": "Diciembre"
+                    };
+                    const nombreMes = meses[mesNum] || mesNum;
+
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <a href="/descargar/${archivo}" target="_blank" style="display: inline-block; background-color: #0284c7; color: white; padding: 6px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">
+                            📥 Descargar registro mensual de ${nombreMes} ${anio}
+                        </a>
+                    `;
+                    contenedorLista.appendChild(li);
+                });
+
+                historialCargado = true;
+            } catch (error) {
+                console.error("Error cargando la lista de CSV:", error);
+                const contenedorLista = document.getElementById('listaArchivosCsv');
+                contenedorLista.innerHTML = '<li>Error al cargar los registros históricos.</li>';
+            }
         }
     });
 }
