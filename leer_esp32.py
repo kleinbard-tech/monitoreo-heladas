@@ -163,12 +163,12 @@ def logo_unco():
 
 @app.route("/logo-fain.jpg")
 def logo_fain():
-    return send_from_directory(".", "Logo-FAIN.jpg")
+    return send_from_directory(".", "logo-fain.jpg")
 
 
 @app.route("/logo-faca.jpg")
 def logo_faca():
-    resuelve = send_from_directory(".", "Logo-FACA.jpg")
+    resuelve = send_from_directory(".", "logo-faca.jpg")
     return resuelve
 
 
