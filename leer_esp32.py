@@ -156,10 +156,20 @@ def estilo():
 def javascript():
     return send_from_directory(".", "script.js")
 
-
 @app.route("/logo-unco.jpg")
 def logo_unco():
     return send_from_directory(".", "logo-unco.jpg")
+
+
+@app.route("/logo-fain.jpg")
+def logo_fain():
+    return send_from_directory(".", "Logo-FAIN.jpg")
+
+
+@app.route("/logo-faca.jpg")
+def logo_faca():
+    resuelve = send_from_directory(".", "Logo-FACA.jpg")
+    return resuelve
 
 
 # =====================================================
