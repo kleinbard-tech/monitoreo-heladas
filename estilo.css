@@ -94,10 +94,12 @@ body {
 }
 
 .encabezado h1 {
-    font-size: 32px;
+    font-size: 28px; /* Ligeramente más compacto para títulos largos */
     font-weight: 700;
     letter-spacing: -0.5px;
-    margin: 0;
+    line-height: 1.2; /* Asegura un buen interlineado si baja a dos renglones */
+    margin: 0 auto;
+    max-width: 900px; /* Evita que se estire demasiado a lo ancho */
     color: #f8fafc;
 }
 
