@@ -156,38 +156,53 @@ function marcarDesconectado(numeroNodo) {
 }
 
 // =====================================================
-// ACTUALIZAR ESTADO INTELIGENTE (GENERAL POR NODOS)
+// ACTUALIZAR ESTADO INTELIGENTE (NODOS, ALERTAS Y CONEXIÓN)
 // =====================================================
 function actualizarEstado(datos) {
     let estadoGeneral = "NORMAL";
     let nodosEnAlerta = [];
+    let cantidadNodosConectados = 0;
 
-    // Recorremos los nodos para ver cuáles están en alerta
+    // Recorremos los datos recibidos
     for (const numNodo in datos) {
         const infoNodo = datos[numNodo];
         
-        if (infoNodo.estado && infoNodo.estado !== "NORMAL") {
-            estadoGeneral = infoNodo.estado;
-            if (numNodo == 1) nodosEnAlerta.push("Nodo 1 (Manzana 1)");
-            if (numNodo == 2) nodosEnAlerta.push("Nodo 2 (Ciruela 1)");
+        // Verificamos si el nodo está conectado (asumimos true si viene en los datos y no marca explícitamente desconectado)
+        if (infoNodo && infoNodo.conectado !== false) {
+            cantidadNodosConectados++;
+
+            // Si está conectado, evaluamos si hay alerta
+            if (infoNodo.estado && infoNodo.estado !== "NORMAL") {
+                estadoGeneral = infoNodo.estado;
+                if (numNodo == 1) nodosEnAlerta.push("Nodo 1 (Manzana 1)");
+                if (numNodo == 2) nodosEnAlerta.push("Nodo 2 (Ciruela 1)");
+            }
         }
     }
 
     const elementoEstado = document.getElementById("estadoGeneral");
     const mensajeEstado = document.getElementById("mensajeEstado");
 
+    // CASO 1: Ningún nodo reporta conexión activa
+    if (cantidadNodosConectados === 0) {
+        elementoEstado.textContent = "DESCONECTADO";
+        mensajeEstado.textContent = "⚠ Sin comunicación con los nodos de la chacra.";
+        elementoEstado.style.color = "#64748b"; // Gris técnico
+        return; // Salimos de la función
+    }
+
+    // CASO 2: Hay nodos conectados, evaluamos alertas
     elementoEstado.textContent = estadoGeneral;
 
-    // Dependiendo de cuántos nodos estén en alerta, armamos el mensaje y el color
     if (nodosEnAlerta.length === 0) {
         mensajeEstado.textContent = "Sin indicios de helada en este momento.";
-        elementoEstado.style.color = "#16a34a"; // Verde
+        elementoEstado.style.color = "#16a34a"; // Verde (Todo en orden)
     } else if (nodosEnAlerta.length === 1) {
         mensajeEstado.textContent = `⚠ ¡Alerta de helada detectada en ${nodosEnAlerta[0]}!`;
-        elementoEstado.style.color = "#dc2626"; // Rojo
+        elementoEstado.style.color = "#dc2626"; // Rojo alerta
     } else {
         mensajeEstado.textContent = `⚠ ¡ALERTA GENERAL DE HELADA! Afecta a: ${nodosEnAlerta.join(" y ")}.`;
-        elementoEstado.style.color = "#dc2626"; // Rojo
+        elementoEstado.style.color = "#dc2626"; // Rojo alerta
     }
 }
 // =====================================================
