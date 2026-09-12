@@ -208,11 +208,11 @@ function inicializarMapa() {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS'
     }).addTo(mapa);
 
-    const marcadorNodo1 = L.marker(coordenadasNodo1).addTo(mapa)
-        .bindPopup('<b>Nodo 1</b><br>Manzana 1');
+   const marcadorNodo1 = L.marker(coordenadasNodo1).addTo(mapa)
+        .bindPopup('<b>Nodo 1 (Manzana 1)</b><br>Chacra Experimental FACA');
 
     const marcadorNodo2 = L.marker(coordenadasNodo2).addTo(mapa)
-        .bindPopup('<b>Nodo 2</b><br>Ciruela 1');
+        .bindPopup('<b>Nodo 2 (Ciruela 1)</b><br>Chacra Experimental FACA');
 
     const grupoNodos = L.featureGroup([marcadorNodo1, marcadorNodo2]);
     mapa.fitBounds(grupoNodos.getBounds().pad(0.4));
