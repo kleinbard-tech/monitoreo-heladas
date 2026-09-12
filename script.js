@@ -155,24 +155,48 @@ function marcarDesconectado(numeroNodo) {
     elConexion.querySelector(".texto-conexion").textContent = "Desconectado";
 }
 
+// =====================================================
+// ACTUALIZAR ESTADO INTELIGENTE (GENERAL POR NODOS)
+// =====================================================
 function actualizarEstado(datos) {
-    let estado = "NORMAL";
+    let estadoGeneral = "NORMAL";
+    let mensaje = "Sin indicios de helada en este momento.";
+    let claseColor = "estado-normal"; // Asumimos verde por defecto
 
-    for (const nodo in datos) {
-        if (datos[nodo].estado && datos[nodo].estado !== "NORMAL") {
-            estado = datos[nodo].estado;
+    // Recorremos los datos recibidos de los nodos (ej: nodo 1 y nodo 2)
+    for (const numNodo in datos) {
+        const infoNodo = datos[numNodo];
+        
+        // Si el nodo mandó un estado que NO es NORMAL (ej: ALERTA, PELIGRO, etc.)
+        if (infoNodo.estado && infoNodo.estado !== "NORMAL") {
+            estadoGeneral = infoNodo.estado;
+            
+            // Personalizamos el mensaje según qué nodo esté en riesgo
+            if (numNodo == 1) {
+                mensaje = "⚠ ¡Alerta de helada detectada en Nodo 1 (Manzana 1)!";
+            } else if (numNodo == 2) {
+                mensaje = "⚠ ¡Alerta de helada detectada en Nodo 2 (Ciruela 1)!";
+            } else {
+                mensaje = `⚠ ¡Alerta de helada detectada en Nodo ${numNodo}!`;
+            }
+            
+            claseColor = "estado-alerta"; // Cambia a rojo/alerta
+            break; // Si hay al menos uno en alerta, priorizamos mostrarlo
         }
     }
 
     const elementoEstado = document.getElementById("estadoGeneral");
     const mensajeEstado = document.getElementById("mensajeEstado");
+    const contenedorEstado = document.querySelector(".estado-general");
 
-    elementoEstado.textContent = estado;
+    elementoEstado.textContent = estadoGeneral;
+    mensajeEstado.textContent = mensaje;
 
-    if (estado === "NORMAL") {
-        mensajeEstado.textContent = "Sin indicios de helada en este momento.";
+    // Actualizamos dinámicamente el color del texto principal
+    if (estadoGeneral === "NORMAL") {
+        elementoEstado.style.color = "#16a34a"; // Verde
     } else {
-        mensajeEstado.textContent = "Se ha detectado una condición de posible helada.";
+        elementoEstado.style.color = "#dc2626"; // Rojo alerta
     }
 }
 
