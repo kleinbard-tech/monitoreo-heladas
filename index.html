@@ -8,7 +8,7 @@
     <title>Monitoreo Microclimático y Alerta Temprana de Heladas</title>
 
     <!-- CSS de Leaflet para el mapa satelital -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
     <!-- Estilos propios -->
     <link rel="stylesheet" href="estilo.css">
@@ -24,18 +24,36 @@
 
         <div class="header-institucional">
 
-           <div class="logos-container">
-                <img src="logo-unco.jpg" alt="Logo de la UNCo" class="logo-institucional">
-                <img src="Logo-fain.jpg" alt="Logo de la FAIN" class="logo-institucional">
-                <img src="Logo-faca.jpg" alt="Logo de la FACA" class="logo-institucional">
+            <div class="logos-container">
+
+                <img src="logo-unco.jpg"
+                     alt="Logo de la UNCo"
+                     class="logo-institucional">
+
+                <img src="logo-fain.jpg"
+                     alt="Logo de la FAIN"
+                     class="logo-institucional">
+
+                <img src="logo-faca.jpg"
+                     alt="Logo de la FACA"
+                     class="logo-institucional">
+
             </div>
 
             <div class="texto-institucional">
-                <strong>Universidad Nacional del Comahue</strong>
-                <span>Facultad de Ingeniería &bull; Facultad de Ciencias Agrarias</span>
+
+                <strong>
+                    Universidad Nacional del Comahue
+                </strong>
+
+                <span>
+                    Facultad de Ingeniería &bull; Facultad de Ciencias Agrarias
+                </span>
+
             </div>
 
         </div>
+
 
         <div class="header-contenido">
 
@@ -43,16 +61,27 @@
                 Proyecto Integrador Profesional
             </div>
 
-            <h1>Monitoreo Microclimático y Alerta Temprana de Heladas</h1>
+            <h1>
+                Monitoreo Microclimático y Alerta Temprana de Heladas
+            </h1>
 
             <div class="header-autor">
-                <span>Desarrollado por:</span>
-                <strong>Matías Ezequiel Kleinbard</strong>
+
+                <span>
+                    Desarrollado por:
+                </span>
+
+                <strong>
+                    Matías Ezequiel Kleinbard
+                </strong>
+
             </div>
 
         </div>
 
     </header>
+
+
 
     <!-- =====================================================
          CONTENIDO PRINCIPAL
@@ -62,7 +91,7 @@
 
 
         <!-- =================================================
-             1. ESTADO AMBIENTAL GENERAL (AHORA ARRIBA)
+             1. ESTADO AMBIENTAL GENERAL
              ================================================= -->
 
         <section class="estado-general">
@@ -82,6 +111,7 @@
         </section>
 
 
+
         <!-- =================================================
              2. INFORMACIÓN DE LOS NODOS
              ================================================= -->
@@ -89,13 +119,17 @@
         <section class="nodos">
 
 
-            <!-- NODO 1 -->
+            <!-- =========================
+                 NODO 1
+                 ========================= -->
 
             <div class="nodo">
 
                 <div class="nodo-header">
 
-                    <h2>Nodo 1 (Manzana 1)</h2>
+                    <h2>
+                        Nodo 1 (Manzana 1)
+                    </h2>
 
                     <p class="conexion conectado" id="nodo1-conexion">
 
@@ -112,6 +146,9 @@
 
                 <div class="datos">
 
+
+                    <!-- Temperatura DS18B20 -->
+
                     <div class="dato dato-principal">
 
                         <span class="etiqueta">
@@ -124,6 +161,8 @@
 
                     </div>
 
+
+                    <!-- Temperatura DHT22 -->
 
                     <div class="dato">
 
@@ -138,6 +177,8 @@
                     </div>
 
 
+                    <!-- Humedad -->
+
                     <div class="dato">
 
                         <span class="etiqueta">
@@ -150,6 +191,8 @@
 
                     </div>
 
+
+                    <!-- Punto de rocío -->
 
                     <div class="dato">
 
@@ -174,13 +217,17 @@
 
 
 
-            <!-- NODO 2 -->
+            <!-- =========================
+                 NODO 2
+                 ========================= -->
 
             <div class="nodo">
 
                 <div class="nodo-header">
 
-                    <h2>Nodo 2 (Ciruela 1)</h2>
+                    <h2>
+                        Nodo 2 (Ciruela 1)
+                    </h2>
 
                     <p class="conexion desconectado" id="nodo2-conexion">
 
@@ -197,6 +244,9 @@
 
                 <div class="datos">
 
+
+                    <!-- Temperatura DS18B20 -->
+
                     <div class="dato dato-principal">
 
                         <span class="etiqueta">
@@ -209,6 +259,8 @@
 
                     </div>
 
+
+                    <!-- Temperatura DHT22 -->
 
                     <div class="dato">
 
@@ -223,6 +275,8 @@
                     </div>
 
 
+                    <!-- Humedad -->
+
                     <div class="dato">
 
                         <span class="etiqueta">
@@ -235,6 +289,8 @@
 
                     </div>
 
+
+                    <!-- Punto de rocío -->
 
                     <div class="dato">
 
@@ -300,7 +356,9 @@
             <div class="area-grafica">
 
                 <div class="contenedor-grafico-scroll">
+
                     <canvas id="graficaTemperatura"></canvas>
+
                 </div>
 
             </div>
@@ -348,21 +406,52 @@
          PIE DE PÁGINA
          ===================================================== -->
 
- <footer class="pie-pagina">
+    <footer class="pie-pagina">
 
         <div class="footer-contenido">
 
+
+            <!-- Logos -->
+
             <div class="logos-container">
-                <img src="logo-unco.jpg" alt="Logo de la UNCo" class="logo-institucional-footer">
-                <img src="Logo-fain.jpg" alt="Logo de la FAIN" class="logo-institucional-footer">
-                <img src="Logo-faca.jpg" alt="Logo de la FACA" class="logo-institucional-footer">
+
+                <img src="logo-unco.jpg"
+                     alt="Logo de la UNCo"
+                     class="logo-institucional-footer">
+
+                <img src="logo-fain.jpg"
+                     alt="Logo de la FAIN"
+                     class="logo-institucional-footer">
+
+                <img src="logo-faca.jpg"
+                     alt="Logo de la FACA"
+                     class="logo-institucional-footer">
+
             </div>
 
+
+            <!-- Texto institucional -->
+
             <div class="footer-texto-institucional">
-                <p><strong>Universidad Nacional del Comahue</strong></p>
-                <p class="footer-subtexto">Facultad de Ingeniería (FAIN)</p>
-                <p class="footer-subtexto">Facultad de Ciencias Agrarias (FACA)</p>
-                <p class="footer-subtexto-proyecto">Proyecto Integrador Profesional — Monitoreo Microclimático y Alerta Temprana de Heladas</p>
+
+                <p>
+                    <strong>
+                        Universidad Nacional del Comahue
+                    </strong>
+                </p>
+
+                <p class="footer-subtexto">
+                    Facultad de Ingeniería (FAIN)
+                </p>
+
+                <p class="footer-subtexto">
+                    Facultad de Ciencias Agrarias (FACA)
+                </p>
+
+                <p class="footer-subtexto-proyecto">
+                    Proyecto Integrador Profesional — Monitoreo Microclimático y Alerta Temprana de Heladas
+                </p>
+
             </div>
 
         </div>
@@ -376,12 +465,17 @@
          ===================================================== -->
 
     <!-- Chart.js -->
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+
     <!-- Leaflet -->
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+
     <!-- JavaScript propio -->
+
     <script src="script.js"></script>
 
 </body>
