@@ -1,3 +1,4 @@
-flask
-pyserial
+Flask
+paho-mqtt
 requests
+gunicorn
