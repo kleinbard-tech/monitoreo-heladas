@@ -1,85 +1,235 @@
 import csv
-import json
 import os
 import threading
 import time
-from datetime import datetime
+import math
+from datetime import datetime, timezone, timedelta
+
+import requests
+
 from flask import Flask, jsonify, send_from_directory
 
-# Librerías opcionales según el entorno (Local o Render)
-try:
-    import serial
-except ImportError:
-    serial = None
 
-try:
-    import requests
-except ImportError:
-    requests = None
+# =====================================================
+# CONFIGURACIÓN
+# =====================================================
 
-try:
-    import paho.mqtt.client as mqtt
-except ImportError:
-    mqtt = None
+# Canal de ThingSpeak
+THINGSPEAK_CHANNEL_ID = "3506543"
+
+# Si el canal de ThingSpeak es público, dejar vacío.
+# Si posteriormente lo hacemos privado, colocar aquí
+# la READ API KEY mediante una variable de entorno.
+THINGSPEAK_READ_API_KEY = os.environ.get(
+    "THINGSPEAK_READ_API_KEY",
+    ""
+)
+
+# Cada cuánto consultar ThingSpeak.
+#
+# ThingSpeak tiene limitaciones de frecuencia para las
+# actualizaciones de canales. 20 segundos es un intervalo
+# seguro para este proyecto.
+INTERVALO_THINGSPEAK = 20
 
 
 # =====================================================
-# CONFIGURACIONES
+# CONFIGURACIÓN DE FLASK
 # =====================================================
-PUERTO_SERIE = "COM3"
-BAUDRATE = 115200
-URL_RENDER = "https://monitoreo-heladas.onrender.com/api/medicion"
 
-# Configuración HiveMQ Cloud (MQTT para Dragino OLG02)
-MQTT_HOST = "45601dd6ca2f47d3aacd8eef0079c27e.s1.eu.hivemq.cloud"
-MQTT_PORT = 8883
-MQTT_USER = "matias_heladas"
-MQTT_PASS = "Monitoreoheladas"
-MQTT_TOPIC_UPLINK = "monitoreo-heladas/uplink"
-
-
-# =====================================================
-# FLASK & MEMORIA EN TIEMPO REAL
-# =====================================================
 app = Flask(__name__)
 
+
+# =====================================================
+# MEMORIA DE DATOS
+# =====================================================
+
+# Guarda el último dato disponible de cada nodo.
+#
+# Ejemplo:
+#
+# datos_actuales = {
+#     1: {
+#         ...
+#     }
+# }
+#
 datos_actuales = {}
+
+
+# Guarda el historial recibido durante la ejecución
+# actual del servidor.
 historial = []
 
 
+# Guarda el ID de ThingSpeak que ya procesamos.
+#
+# Esto es importante para no guardar varias veces
+# el mismo registro en el CSV.
+ultimo_entry_id_procesado = None
+
+
 # =====================================================
-# LÓGICA DE NEGOCIO: DETERMINAR ESTADO EN PYTHON
+# CÁLCULO DEL PUNTO DE ROCÍO
 # =====================================================
+
+def calcular_punto_rocio(temperatura, humedad):
+    """
+    Calcula el punto de rocío mediante la aproximación
+    de Magnus-Tetens.
+
+    temperatura -> temperatura en °C
+    humedad     -> humedad relativa en %
+
+    Devuelve el punto de rocío en °C.
+    """
+
+    try:
+
+        # Constantes utilizadas para la aproximación
+        a = 17.27
+        b = 237.7
+
+        # Evitamos valores inválidos
+        if humedad <= 0:
+            return None
+
+        if humedad > 100:
+            humedad = 100
+
+        alpha = (
+            (a * temperatura) / (b + temperatura)
+            + math.log(humedad / 100.0)
+        )
+
+        punto_rocio = (
+            (b * alpha) /
+            (a - alpha)
+        )
+
+        return punto_rocio
+
+    except Exception as e:
+
+        print(f"⚠ Error calculando punto de rocío: {e}")
+
+        return None
+
+
+# =====================================================
+# DETERMINAR ESTADO AMBIENTAL
+# =====================================================
+
 def determinar_estado(temperatura_ds, punto_rocio):
-    """Calcula el estado de alerta en base a la temperatura de la sonda y el punto de rocío."""
+    """
+    Determina el estado ambiental según la temperatura
+    medida por el DS18B20 y el punto de rocío.
+    """
+
+    if punto_rocio is None:
+        return "NORMAL"
+
+    # Helada
     if temperatura_ds <= 0.0:
         return "HELADA"
 
+    # Situación de riesgo
     diferencia = temperatura_ds - punto_rocio
 
     if temperatura_ds <= 3.0 and diferencia <= 2.0:
         return "RIESGO"
 
+    # Situación normal
     return "NORMAL"
+
+
+# =====================================================
+# CONVERTIR FECHA DE THINGSPEAK
+# =====================================================
+
+def convertir_fecha_thingspeak(fecha_texto):
+    """
+    ThingSpeak entrega normalmente la fecha en UTC,
+    por ejemplo:
+
+    2026-09-23T23:20:15Z
+
+    La convertimos a hora local de Argentina (UTC-3).
+    """
+
+    try:
+
+        fecha_utc = datetime.fromisoformat(
+            fecha_texto.replace("Z", "+00:00")
+        )
+
+        zona_argentina = timezone(
+            timedelta(hours=-3)
+        )
+
+        fecha_local = fecha_utc.astimezone(
+            zona_argentina
+        )
+
+        return fecha_local.strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+
+    except Exception:
+
+        # Si por alguna razón ThingSpeak entrega
+        # un formato inesperado, usamos la hora local
+        # del servidor.
+        return datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
 
 
 # =====================================================
 # GUARDAR EN CSV MENSUAL
 # =====================================================
+
 def guardar_en_csv(registro):
+
     try:
+
+        # Crear carpeta si no existe
         if not os.path.exists("registros"):
             os.makedirs("registros")
 
-        solo_fecha = registro["fechaHora"].split(" ")[0]
-        anio_mes = solo_fecha[:7]
+        # Obtener fecha
+        fecha = registro.get(
+            "fechaHora",
+            ""
+        )
 
-        nombre_archivo = f"registros/historial_{anio_mes}.csv"
-        archivo_existe = os.path.exists(nombre_archivo)
+        if not fecha:
+            return
 
-        with open(nombre_archivo, mode="a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
+        # Obtener año y mes
+        anio_mes = fecha[:7]
+
+        nombre_archivo = (
+            f"registros/historial_{anio_mes}.csv"
+        )
+
+        archivo_existe = os.path.exists(
+            nombre_archivo
+        )
+
+        with open(
+            nombre_archivo,
+            mode="a",
+            newline="",
+            encoding="utf-8"
+        ) as archivo:
+
+            writer = csv.writer(archivo)
+
+            # Escribir encabezado solamente
+            # si el archivo es nuevo
             if not archivo_existe:
+
                 writer.writerow([
                     "FechaHora",
                     "Nodo",
@@ -88,252 +238,730 @@ def guardar_en_csv(registro):
                     "TemperaturaDHT",
                     "Humedad",
                     "PuntoRocio",
-                    "Estado",
+                    "Estado"
                 ])
 
             writer.writerow([
-                registro.get("fechaHora", ""),
-                registro.get("nodo", 1),
-                registro.get("medicion", 0),
-                registro.get("temperaturaDS", 0.0),
-                registro.get("temperaturaDHT", 0.0),
-                registro.get("humedad", 0.0),
-                registro.get("puntoRocio", 0.0),
-                registro.get("estado", "NORMAL"),
+
+                registro.get(
+                    "fechaHora",
+                    ""
+                ),
+
+                registro.get(
+                    "nodo",
+                    1
+                ),
+
+                registro.get(
+                    "medicion",
+                    0
+                ),
+
+                registro.get(
+                    "temperaturaDS",
+                    0.0
+                ),
+
+                registro.get(
+                    "temperaturaDHT",
+                    0.0
+                ),
+
+                registro.get(
+                    "humedad",
+                    0.0
+                ),
+
+                registro.get(
+                    "puntoRocio",
+                    0.0
+                ),
+
+                registro.get(
+                    "estado",
+                    "NORMAL"
+                )
             ])
+
+        print(
+            f"✓ Registro guardado en {nombre_archivo}"
+        )
+
     except Exception as e:
-        print(f"⚠ Error al guardar en CSV: {e}")
+
+        print(
+            f"⚠ Error al guardar en CSV: {e}"
+        )
 
 
 # =====================================================
-# PARSER UNIFICADO DE TRAMAS ("DATOS:1,1,14.2,14.5,65.0,7.8")
+# PROCESAR REGISTRO DE THINGSPEAK
 # =====================================================
-def procesar_cadena_datos(cadena_texto):
-    """Recibe la trama limpia sin el prefijo DATOS: y la convierte en diccionario."""
+
+def procesar_registro_thingspeak(registro_ts):
+    """
+    Recibe un registro individual de ThingSpeak.
+
+    Para Nodo 1:
+
+    field1 -> DS18B20
+    field2 -> DHT22
+    field3 -> Humedad
+
+    Devuelve el diccionario que utiliza el resto
+    de la aplicación.
+    """
+
     try:
-        valores = cadena_texto.replace("DATOS:", "").strip().split(",")
 
-        # AHORA ESPERAMOS 6 VALORES (sin el estado)
-        if len(valores) == 6:
-            nodo = int(valores[0])
-            medicion = int(valores[1])
-            temp_ds = float(valores[2])
-            temp_dht = float(valores[3])
-            humedad = float(valores[4])
-            punto_rocio = float(valores[5])
+        # -------------------------------------------------
+        # Obtener campos de ThingSpeak
+        # -------------------------------------------------
 
-            # Determinamos el estado usando TU función de Python
-            estado = determinar_estado(temp_ds, punto_rocio)
-            fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        field1 = registro_ts.get("field1")
+        field2 = registro_ts.get("field2")
+        field3 = registro_ts.get("field3")
 
-            return {
-                "fechaHora": fecha_hora,
-                "nodo": nodo,
-                "medicion": medicion,
-                "temperaturaDS": temp_ds,
-                "temperaturaDHT": temp_dht,
-                "humedad": humedad,
-                "puntoRocio": punto_rocio,
-                "estado": estado,
-                "conectado": True,
+        # Verificar que existan los tres valores
+        if field1 is None:
+            print("⚠ ThingSpeak: Field 1 vacío")
+            return None
+
+        if field2 is None:
+            print("⚠ ThingSpeak: Field 2 vacío")
+            return None
+
+        if field3 is None:
+            print("⚠ ThingSpeak: Field 3 vacío")
+            return None
+
+        # Convertir valores
+        temperatura_ds = float(field1)
+        temperatura_dht = float(field2)
+        humedad = float(field3)
+
+        # -------------------------------------------------
+        # Calcular punto de rocío
+        # -------------------------------------------------
+
+        punto_rocio = calcular_punto_rocio(
+            temperatura_dht,
+            humedad
+        )
+
+        # -------------------------------------------------
+        # Determinar estado
+        # -------------------------------------------------
+
+        estado = determinar_estado(
+            temperatura_ds,
+            punto_rocio
+        )
+
+        # -------------------------------------------------
+        # Fecha
+        # -------------------------------------------------
+
+        fecha_hora = convertir_fecha_thingspeak(
+            registro_ts.get("created_at", "")
+        )
+
+        # -------------------------------------------------
+        # Entry ID de ThingSpeak
+        #
+        # Lo utilizamos como número de medición.
+        # -------------------------------------------------
+
+        medicion = int(
+            registro_ts.get(
+                "entry_id",
+                0
+            )
+        )
+
+        # -------------------------------------------------
+        # Crear registro
+        # -------------------------------------------------
+
+        registro = {
+
+            "fechaHora": fecha_hora,
+
+            "nodo": 1,
+
+            "medicion": medicion,
+
+            "temperaturaDS": temperatura_ds,
+
+            "temperaturaDHT": temperatura_dht,
+
+            "humedad": humedad,
+
+            "puntoRocio": punto_rocio,
+
+            "estado": estado,
+
+            "conectado": True
+        }
+
+        return registro
+
+    except Exception as e:
+
+        print(
+            f"⚠ Error procesando registro "
+            f"de ThingSpeak: {e}"
+        )
+
+        return None
+
+
+# =====================================================
+# CONSULTAR THINGSPEAK
+# =====================================================
+
+def consultar_thingspeak():
+
+    global ultimo_entry_id_procesado
+
+    print("\n========================================")
+    print("   LECTOR THINGSPEAK - NODO 1")
+    print("========================================")
+    print(
+        f"Canal: {THINGSPEAK_CHANNEL_ID}"
+    )
+    print(
+        f"Intervalo: {INTERVALO_THINGSPEAK} segundos"
+    )
+    print("========================================\n")
+
+    while True:
+
+        try:
+
+            # -------------------------------------------------
+            # URL de la API
+            # -------------------------------------------------
+
+            url = (
+                "https://api.thingspeak.com/"
+                f"channels/{THINGSPEAK_CHANNEL_ID}/feeds.json"
+            )
+
+            # -------------------------------------------------
+            # Parámetros
+            #
+            # results=1 significa que solamente pedimos
+            # el último registro.
+            # -------------------------------------------------
+
+            parametros = {
+                "results": 1
             }
-        else:
-            print(f"⚠ Cantidad de parámetros incorrecta ({len(valores)} de 6 esperados)")
-    except Exception as e:
-        print(f"⚠ Error parseando trama: {e}")
 
-    return None
+            # Si existe una READ API KEY, la utilizamos.
+            if THINGSPEAK_READ_API_KEY:
 
+                parametros["api_key"] = (
+                    THINGSPEAK_READ_API_KEY
+                )
 
-# =====================================================
-# 1. ESCUCHA VÍA MQTT (HIVERMQ CLOUD / DRAGINO)
-# =====================================================
-def on_connect(client, userdata, flags, rc, properties=None):
-    if rc == 0:
-        print(" Connected to HiveMQ Cloud Broker!")
-        client.subscribe(MQTT_TOPIC_UPLINK, qos=1)
-    else:
-        print(f"⚠ Error de conexión MQTT: {rc}")
+            # -------------------------------------------------
+            # Realizar consulta
+            # -------------------------------------------------
 
+            respuesta = requests.get(
+                url,
+                params=parametros,
+                timeout=10
+            )
 
-def on_message(client, userdata, msg):
-    try:
-        payload = msg.payload.decode("utf-8")
-        print(f"\n Mensaje MQTT recibido: {payload}")
+            # Verificar HTTP
+            respuesta.raise_for_status()
 
-        registro = procesar_cadena_datos(payload)
-        if registro:
-            nodo = registro["nodo"]
-            datos_actuales[nodo] = registro
-            historial.append(registro)
-            guardar_en_csv(registro)
+            datos = respuesta.json()
+
+            # -------------------------------------------------
+            # Verificar que haya feeds
+            # -------------------------------------------------
+
+            feeds = datos.get(
+                "feeds",
+                []
+            )
+
+            if not feeds:
+
+                print(
+                    "⚠ ThingSpeak no devolvió registros."
+                )
+
+                time.sleep(
+                    INTERVALO_THINGSPEAK
+                )
+
+                continue
+
+            # -------------------------------------------------
+            # Obtener último registro
+            # -------------------------------------------------
+
+            registro_ts = feeds[0]
+
+            entry_id = int(
+                registro_ts.get(
+                    "entry_id",
+                    0
+                )
+            )
+
+            # -------------------------------------------------
+            # Evitar procesar nuevamente
+            # el mismo registro
+            # -------------------------------------------------
+
+            if (
+                ultimo_entry_id_procesado
+                == entry_id
+            ):
+
+                print(
+                    f"ThingSpeak: sin datos nuevos "
+                    f"(Entry ID {entry_id})"
+                )
+
+                time.sleep(
+                    INTERVALO_THINGSPEAK
+                )
+
+                continue
+
+            # -------------------------------------------------
+            # Procesar registro
+            # -------------------------------------------------
+
+            registro = procesar_registro_thingspeak(
+                registro_ts
+            )
+
+            if registro is not None:
+
+                # Actualizar Nodo 1
+                datos_actuales[1] = registro
+
+                # Agregar al historial
+                historial.append(
+                    registro
+                )
+
+                # Guardar CSV
+                guardar_en_csv(
+                    registro
+                )
+
+                # Guardar Entry ID
+                ultimo_entry_id_procesado = (
+                    entry_id
+                )
+
+                # Mostrar información
+                print(
+                    "\n✓ NUEVA MEDICIÓN"
+                )
+
+                print(
+                    f"  Entry ID: {entry_id}"
+                )
+
+                print(
+                    f"  Fecha: "
+                    f"{registro['fechaHora']}"
+                )
+
+                print(
+                    f"  Nodo: "
+                    f"{registro['nodo']}"
+                )
+
+                print(
+                    f"  DS18B20: "
+                    f"{registro['temperaturaDS']:.2f} °C"
+                )
+
+                print(
+                    f"  DHT22: "
+                    f"{registro['temperaturaDHT']:.2f} °C"
+                )
+
+                print(
+                    f"  Humedad: "
+                    f"{registro['humedad']:.2f} %"
+                )
+
+                if registro["puntoRocio"] is not None:
+
+                    print(
+                        f"  Punto de rocío: "
+                        f"{registro['puntoRocio']:.2f} °C"
+                    )
+
+                print(
+                    f"  Estado: "
+                    f"{registro['estado']}"
+                )
+
+            # -------------------------------------------------
+            # Esperar próxima consulta
+            # -------------------------------------------------
+
+            time.sleep(
+                INTERVALO_THINGSPEAK
+            )
+
+        except requests.exceptions.RequestException as e:
 
             print(
-                f" MQTT -> Nodo: {nodo} | TempDS: {registro['temperaturaDS']}°C | "
-                f"P.Rocío: {registro['puntoRocio']}°C | Estado: {registro['estado']}"
+                f"⚠ Error HTTP consultando "
+                f"ThingSpeak: {e}"
             )
-    except Exception as e:
-        print(f"⚠ Error procesando MQTT: {e}")
 
-
-def iniciar_mqtt():
-    if mqtt is None:
-        print("⚠ 'paho-mqtt' no instalado. Hilo MQTT deshabilitado.")
-        return
-
-    while True:
-        try:
-            try:
-                client = mqtt.Client(client_id="Servidor_Flask_Render", protocol=mqtt.MQTTv5)
-            except AttributeError:
-                client = mqtt.Client(client_id="Servidor_Flask_Render")
-
-            client.username_pw_set(MQTT_USER, MQTT_PASS)
-            client.tls_set()
-            client.on_connect = on_connect
-            client.on_message = on_message
-
-            client.connect(MQTT_HOST, MQTT_PORT, keepalive=60)
-            client.loop_forever()
-        except Exception as e:
-            print(f"⚠ Reintentando conexión MQTT en 5s... ({e})")
-            time.sleep(5)
-
-
-# =====================================================
-# 2. ESCUCHA VÍA PUERTO SERIE (RESPALDO LOCAL)
-# =====================================================
-def leer_esp32_serie():
-    global datos_actuales, historial
-
-    if serial is None:
-        print("⚠ 'pyserial' no instalado. Lectura Serie deshabilitada.")
-        return
-
-    while True:
-        try:
-            esp32 = serial.Serial(PUERTO_SERIE, BAUDRATE, timeout=1)
-            print(f"ESP32 conectado en Serie: {PUERTO_SERIE}")
-
-            while True:
-                linea = esp32.readline().decode("utf-8", errors="ignore").strip()
-
-                if linea.startswith("DATOS:"):
-                    registro = procesar_cadena_datos(linea)
-
-                    if registro:
-                        nodo = registro["nodo"]
-                        datos_actuales[nodo] = registro
-                        historial.append(registro)
-                        guardar_en_csv(registro)
-
-                        print(
-                            f" SERIE -> Nodo: {nodo} | T.DS: {registro['temperaturaDS']}°C | "
-                            f"Estado: {registro['estado']}"
-                        )
-
-                        # Reenviar a Render si se está ejecutando en local
-                        if requests is not None:
-                            try:
-                                requests.post(URL_RENDER, json=registro, timeout=3)
-                            except Exception:
-                                pass
+            time.sleep(
+                INTERVALO_THINGSPEAK
+            )
 
         except Exception as e:
-            time.sleep(5)
+
+            print(
+                f"⚠ Error en lector ThingSpeak: {e}"
+            )
+
+            time.sleep(
+                INTERVALO_THINGSPEAK
+            )
 
 
 # =====================================================
-# RUTAS DE PÁGINA WEB Y API
+# RUTAS DE LA PÁGINA WEB
 # =====================================================
+
 @app.route("/")
 def pagina_principal():
-    return send_from_directory(".", "index.html")
+
+    return send_from_directory(
+        ".",
+        "index.html"
+    )
+
 
 @app.route("/estilo.css")
 def estilo():
-    return send_from_directory(".", "estilo.css")
+
+    return send_from_directory(
+        ".",
+        "estilo.css"
+    )
+
 
 @app.route("/script.js")
 def javascript():
-    return send_from_directory(".", "script.js")
+
+    return send_from_directory(
+        ".",
+        "script.js"
+    )
+
+
+# =====================================================
+# LOGOS
+# =====================================================
 
 @app.route("/logo-unco.jpg")
 def logo_unco():
-    return send_from_directory(".", "logo-unco.jpg")
+
+    return send_from_directory(
+        ".",
+        "logo-unco.jpg"
+    )
+
 
 @app.route("/logo-fain.jpg")
 def logo_fain():
-    return send_from_directory(".", "logo-fain.jpg")
+
+    return send_from_directory(
+        ".",
+        "logo-fain.jpg"
+    )
+
 
 @app.route("/logo-faca.jpg")
 def logo_faca():
-    return send_from_directory(".", "logo-faca.jpg")
 
-@app.route("/datos", methods=["GET"])
+    return send_from_directory(
+        ".",
+        "logo-faca.jpg"
+    )
+
+
+# =====================================================
+# API - DATOS ACTUALES
+# =====================================================
+
+@app.route(
+    "/datos",
+    methods=["GET"]
+)
 def obtener_datos():
-    return jsonify(datos_actuales)
 
-@app.route("/historial", methods=["GET"])
+    return jsonify(
+        datos_actuales
+    )
+
+
+# =====================================================
+# API - HISTORIAL
+# =====================================================
+
+@app.route(
+    "/historial",
+    methods=["GET"]
+)
 def obtener_historial():
-    return jsonify(historial)
 
-@app.route("/api/archivos-csv", methods=["GET"])
+    return jsonify(
+        historial
+    )
+
+
+# =====================================================
+# API - LISTAR CSV
+# =====================================================
+
+@app.route(
+    "/api/archivos-csv",
+    methods=["GET"]
+)
 def listar_archivos_csv():
-    if not os.path.exists("registros"):
+
+    if not os.path.exists(
+        "registros"
+    ):
+
         return jsonify([])
-    archivos = sorted(os.listdir("registros"), reverse=True)
-    return jsonify([f for f in archivos if f.endswith(".csv")])
 
-@app.route("/descargar/<nombre_archivo>")
-def descargar_csv(nombre_archivo):
-    return send_from_directory("registros", nombre_archivo, as_attachment=True)
+    archivos = sorted(
+        os.listdir("registros"),
+        reverse=True
+    )
 
-@app.route("/api/medicion", methods=["POST"])
-def recibir_medicion():
-    from flask import request
-    try:
-        data = request.get_json()
-        nodo = int(data.get("nodo", 1))
+    archivos_csv = []
 
-        if "fechaHora" not in data or not data["fechaHora"]:
-            data["fechaHora"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for archivo in archivos:
 
-        # Recalcular o asegurar estado si no viniera
-        if "estado" not in data:
-            data["estado"] = determinar_estado(
-                float(data.get("temperaturaDS", 0)), float(data.get("puntoRocio", 0))
+        if archivo.endswith(".csv"):
+
+            archivos_csv.append(
+                archivo
             )
 
+    return jsonify(
+        archivos_csv
+    )
+
+
+# =====================================================
+# DESCARGAR CSV
+# =====================================================
+
+@app.route(
+    "/descargar/<nombre_archivo>"
+)
+def descargar_csv(
+    nombre_archivo
+):
+
+    return send_from_directory(
+        "registros",
+        nombre_archivo,
+        as_attachment=True
+    )
+
+
+# =====================================================
+# API - RECEPCIÓN MANUAL
+#
+# La mantenemos para no romper la arquitectura
+# existente. Puede servir posteriormente para
+# pruebas o para enviar datos desde otro equipo.
+# =====================================================
+
+@app.route(
+    "/api/medicion",
+    methods=["POST"]
+)
+def recibir_medicion():
+
+    from flask import request
+
+    try:
+
+        data = request.get_json()
+
+        nodo = int(
+            data.get(
+                "nodo",
+                1
+            )
+        )
+
+        # Fecha
+        if (
+            "fechaHora" not in data
+            or not data["fechaHora"]
+        ):
+
+            data["fechaHora"] = (
+                datetime.now().strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+            )
+
+        # Convertir valores numéricos
+        temperatura_ds = float(
+            data.get(
+                "temperaturaDS",
+                0
+            )
+        )
+
+        temperatura_dht = float(
+            data.get(
+                "temperaturaDHT",
+                0
+            )
+        )
+
+        humedad = float(
+            data.get(
+                "humedad",
+                0
+            )
+        )
+
+        # Si no viene punto de rocío,
+        # lo calculamos.
+        if (
+            "puntoRocio" not in data
+            or data["puntoRocio"] is None
+        ):
+
+            data["puntoRocio"] = (
+                calcular_punto_rocio(
+                    temperatura_dht,
+                    humedad
+                )
+            )
+
+        # Si no viene estado,
+        # lo calculamos.
+        if (
+            "estado" not in data
+            or not data["estado"]
+        ):
+
+            data["estado"] = (
+                determinar_estado(
+                    temperatura_ds,
+                    data["puntoRocio"]
+                )
+            )
+
+        # Marcar conexión
+        data["conectado"] = True
+
+        # Actualizar nodo
         datos_actuales[nodo] = data
-        historial.append(data)
-        guardar_en_csv(data)
 
-        return jsonify({"status": "ok", "message": "Datos recibidos correctamente"}), 200
+        # Historial
+        historial.append(
+            data
+        )
+
+        # CSV
+        guardar_en_csv(
+            data
+        )
+
+        return jsonify({
+            "status": "ok",
+            "message":
+                "Datos recibidos correctamente"
+        }), 200
+
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 400
+
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 400
 
 
 # =====================================================
-# INICIO DEL SERVIDOR (MQTT + SERIE + FLASK)
+# INICIO DEL SERVIDOR
 # =====================================================
+
 if __name__ == "__main__":
-    # Hilo 1: Escucha constante a HiveMQ Cloud (LoRa / Dragino)
-    hilo_mqtt = threading.Thread(target=iniciar_mqtt, daemon=True)
-    hilo_mqtt.start()
 
-    # Hilo 2: Escucha puerto Serie local USB (COM3)
-    hilo_serie = threading.Thread(target=leer_esp32_serie, daemon=True)
-    hilo_serie.start()
+    # -------------------------------------------------
+    # Hilo de ThingSpeak
+    # -------------------------------------------------
 
-    port = int(os.environ.get("PORT", 5000))
+    hilo_thingspeak = threading.Thread(
+        target=consultar_thingspeak,
+        daemon=True
+    )
+
+    hilo_thingspeak.start()
+
+    # -------------------------------------------------
+    # Puerto de Flask
+    #
+    # Render proporciona PORT mediante variable
+    # de entorno.
+    # -------------------------------------------------
+
+    port = int(
+        os.environ.get(
+            "PORT",
+            5000
+        )
+    )
 
     print("\n========================================")
-    print("      SERVIDOR WEB - MONITOREO HELADAS  ")
-    print("========================================\n")
-    print(" -> Escuchando MQTT en HiveMQ Cloud")
-    print(f" -> Escuchando Puerto Serie local ({PUERTO_SERIE})")
-    print(f" -> Servidor corriendo en puerto: {port}")
+    print("   SERVIDOR WEB - MONITOREO HELADAS")
+    print("========================================")
+    print("")
+    print(
+        " -> Fuente de datos: ThingSpeak"
+    )
+    print(
+        f" -> Canal: {THINGSPEAK_CHANNEL_ID}"
+    )
+    print(
+        " -> Nodo activo: Nodo 1"
+    )
+    print(
+        " -> Flask escuchando en puerto:",
+        port
+    )
     print("========================================\n")
 
-    app.run(host="0.0.0.0", port=port)
+    # -------------------------------------------------
+    # Iniciar Flask
+    # -------------------------------------------------
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
+
