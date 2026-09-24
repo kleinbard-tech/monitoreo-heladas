@@ -26,8 +26,8 @@ INTERVALO_THINGSPEAK = 20
 # Tiempo máximo sin recibir datos antes de considerar
 # desconectado el nodo.
 #
-# Como más adelante el nodo transmitirá cada 5 minutos,
-# usamos 10 minutos como margen.
+# El nodo transmitirá cada 5 minutos,
+# por eso dejamos 10 minutos de margen.
 TIEMPO_DESCONEXION = 600
 
 
@@ -51,6 +51,13 @@ ultimo_entry_id_procesado = None
 # Guarda el momento en que se recibió el último
 # registro válido de cada nodo.
 ultima_recepcion_nodo = {}
+
+
+# =====================================================
+# ENTRY IDS GUARDADOS EN CSV
+# =====================================================
+
+entry_ids_csv = set()
 
 
 # =====================================================
@@ -160,7 +167,7 @@ def convertir_fecha_thingspeak(fecha_texto):
 
 
 # =====================================================
-# CONVERTIR FECHA DE THINGSPEAK A DATETIME
+# OBTENER DATETIME UTC DE THINGSPEAK
 # =====================================================
 
 def obtener_datetime_thingspeak(fecha_texto):
@@ -410,13 +417,6 @@ def obtener_entry_ids_csv():
 
 
 # =====================================================
-# ENTRY IDS GUARDADOS
-# =====================================================
-
-entry_ids_csv = set()
-
-
-# =====================================================
 # GUARDAR EN CSV MENSUAL
 # =====================================================
 
@@ -482,12 +482,6 @@ def guardar_en_csv(registro):
 
         # -----------------------------------------
         # Obtener año y mes
-        #
-        # Ejemplo:
-        # 2026-09-24 15:20:04
-        #
-        # queda:
-        # 2026-09
         # -----------------------------------------
 
         anio_mes = fecha[:7]
@@ -539,10 +533,32 @@ def guardar_en_csv(registro):
                 ])
 
             # -------------------------------------
+            # Función para formato numérico CSV
+            # -------------------------------------
+
+            def numero_csv(valor):
+
+                if valor is None:
+
+                    return ""
+
+                try:
+
+                    return (
+                        f"{float(valor):.2f}"
+                        .replace(".", ",")
+                    )
+
+                except Exception:
+
+                    return ""
+
+            # -------------------------------------
             # Escribir medición
             # -------------------------------------
 
             escritor.writerow([
+
                 registro.get(
                     "fechaHora",
                     ""
@@ -558,24 +574,28 @@ def guardar_en_csv(registro):
                     0
                 ),
 
-                registro.get(
-                    "temperaturaDS",
-                    0.0
+                numero_csv(
+                    registro.get(
+                        "temperaturaDS"
+                    )
                 ),
 
-                registro.get(
-                    "temperaturaDHT",
-                    0.0
+                numero_csv(
+                    registro.get(
+                        "temperaturaDHT"
+                    )
                 ),
 
-                registro.get(
-                    "humedad",
-                    0.0
+                numero_csv(
+                    registro.get(
+                        "humedad"
+                    )
                 ),
 
-                registro.get(
-                    "puntoRocio",
-                    0.0
+                numero_csv(
+                    registro.get(
+                        "puntoRocio"
+                    )
                 ),
 
                 registro.get(
@@ -802,8 +822,10 @@ def cargar_historial_inicial():
             "feeds.json"
         )
 
-        # ThingSpeak permite solicitar hasta 8000
-        # registros en una consulta.
+        # -----------------------------------------
+        # Solicitar hasta 8000 registros
+        # -----------------------------------------
+
         parametros = {
             "results": 8000
         }
@@ -837,9 +859,13 @@ def cargar_historial_inicial():
             )
 
             datos_actuales[1] = {
+
                 "nodo": 1,
+
                 "conectado": False,
+
                 "estado": "NORMAL",
+
                 "mensaje": "Sin datos"
             }
 
@@ -855,11 +881,7 @@ def cargar_historial_inicial():
         ultimo_registro = None
 
         # -----------------------------------------
-        # ThingSpeak entrega los registros desde
-        # el más antiguo hasta el más reciente.
-        #
-        # Los procesamos en ese orden para que
-        # el CSV quede cronológico.
+        # Procesar registros
         # -----------------------------------------
 
         for feed in feeds:
@@ -888,8 +910,6 @@ def cargar_historial_inicial():
 
             # -------------------------------------
             # Guardar en CSV
-            #
-            # guardar_en_csv() evita duplicados.
             # -------------------------------------
 
             guardar_en_csv(
@@ -898,9 +918,6 @@ def cargar_historial_inicial():
 
         # -----------------------------------------
         # Mantener máximo 1000 registros en memoria
-        # para el dashboard.
-        #
-        # El CSV conserva todos los registros.
         # -----------------------------------------
 
         if len(historial) > 1000:
@@ -923,7 +940,7 @@ def cargar_historial_inicial():
 
             # -------------------------------------
             # Determinar conexión según la edad
-            # del último dato.
+            # del último dato
             # -------------------------------------
 
             feed_fecha = feeds[-1].get(
@@ -985,6 +1002,11 @@ def cargar_historial_inicial():
         print(
             f"✓ Registros cargados en memoria: "
             f"{len(historial)}"
+        )
+
+        print(
+            f"✓ Registros procesados: "
+            f"{registros_cargados}"
         )
 
         print(
@@ -1198,7 +1220,6 @@ def consultar_thingspeak():
 
             # ---------------------------------
             # Comprobar si ya procesamos
-            # este registro
             # ---------------------------------
 
             if (
@@ -1244,7 +1265,7 @@ def consultar_thingspeak():
                 )
 
                 # -----------------------------
-                # Marcar nodo como conectado
+                # Marcar nodo conectado
                 # -----------------------------
 
                 datos_actuales[1][
@@ -1264,7 +1285,7 @@ def consultar_thingspeak():
                 )
 
                 # -----------------------------
-                # Mantener historial limitado
+                # Mantener máximo 1000
                 # -----------------------------
 
                 if len(historial) > 1000:
@@ -1451,7 +1472,7 @@ def obtener_datos():
 
 
 # =====================================================
-# HISTORIAL
+# HISTORIAL PARA EL GRÁFICO
 # =====================================================
 
 @app.route(
@@ -1460,8 +1481,49 @@ def obtener_datos():
 )
 def obtener_historial():
 
+    # -----------------------------------------
+    # El historial completo permanece en memoria
+    # hasta 1000 registros.
+    #
+    # Pero la página solamente recibe las últimas
+    # 12 horas para que el gráfico sea legible.
+    # -----------------------------------------
+
+    ahora = datetime.now()
+
+    limite = (
+        ahora -
+        timedelta(hours=12)
+    )
+
+    historial_12_horas = []
+
+    for registro in historial:
+
+        try:
+
+            fecha_texto = registro.get(
+                "fechaHora",
+                ""
+            )
+
+            fecha_registro = datetime.strptime(
+                fecha_texto,
+                "%Y-%m-%d %H:%M:%S"
+            )
+
+            if fecha_registro >= limite:
+
+                historial_12_horas.append(
+                    registro
+                )
+
+        except Exception:
+
+            continue
+
     return jsonify(
-        historial
+        historial_12_horas
     )
 
 
@@ -1786,6 +1848,14 @@ if __name__ == "__main__":
 
     print(
         " -> CSV: separado por punto y coma (;)"
+    )
+
+    print(
+        " -> CSV: números con coma decimal"
+    )
+
+    print(
+        " -> Gráfico: últimas 12 horas"
     )
 
     print(
