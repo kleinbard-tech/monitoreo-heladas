@@ -6,50 +6,41 @@ import math
 from datetime import datetime, timezone, timedelta
 
 import requests
-from flask import Flask, jsonify, send_from_directory, send_file
+
+from flask import Flask, jsonify, send_from_directory
 
 
-# ============================================================
+# =====================================================
 # CONFIGURACIÓN
-# ============================================================
+# =====================================================
 
 THINGSPEAK_CHANNEL_ID = "3506543"
 
-# Clave de lectura de ThingSpeak
-#
-# En Render configurar:
-#
-# THINGSPEAK_READ_API_KEY=xxxxxxxxxxxxxxxx
-#
 THINGSPEAK_READ_API_KEY = os.environ.get(
     "THINGSPEAK_READ_API_KEY",
     ""
 )
 
-# Tiempo entre consultas a ThingSpeak
 INTERVALO_THINGSPEAK = 20
 
-# Cantidad de registros que se recuperan de ThingSpeak
-# cuando se inicia el programa
-CANTIDAD_HISTORIAL_INICIAL = 1000
-
 # Tiempo máximo sin recibir datos antes de considerar
-# desconectado al nodo.
+# desconectado el nodo.
 #
-# 600 segundos = 10 minutos
+# Como más adelante el nodo transmitirá cada 5 minutos,
+# usamos 10 minutos como margen.
 TIEMPO_DESCONEXION = 600
 
 
-# ============================================================
-# FLASK
-# ============================================================
+# =====================================================
+# CONFIGURACIÓN DE FLASK
+# =====================================================
 
 app = Flask(__name__)
 
 
-# ============================================================
-# VARIABLES GLOBALES
-# ============================================================
+# =====================================================
+# MEMORIA DE DATOS
+# =====================================================
 
 datos_actuales = {}
 
@@ -57,120 +48,470 @@ historial = []
 
 ultimo_entry_id_procesado = None
 
-# Guarda cuándo se recibió el último dato de cada nodo
+# Guarda el momento en que se recibió el último
+# registro válido de cada nodo.
 ultima_recepcion_nodo = {}
 
 
-# ============================================================
-# PUNTO DE ROCÍO
-# ============================================================
+# =====================================================
+# CÁLCULO DEL PUNTO DE ROCÍO
+# =====================================================
 
 def calcular_punto_rocio(temperatura, humedad):
 
-    a = 17.27
-    b = 237.7
+    try:
 
-    if humedad <= 0:
+        a = 17.27
+        b = 237.7
+
+        if humedad <= 0:
+
+            return None
+
+        if humedad > 100:
+
+            humedad = 100
+
+        alpha = (
+            (a * temperatura) / (b + temperatura)
+            + math.log(humedad / 100.0)
+        )
+
+        punto_rocio = (
+            (b * alpha) /
+            (a - alpha)
+        )
+
+        return punto_rocio
+
+    except Exception as e:
+
+        print(
+            f"⚠ Error calculando punto de rocío: {e}"
+        )
+
         return None
 
-    if humedad > 100:
-        humedad = 100
 
-    alpha = (
-        (a * temperatura) / (b + temperatura)
-        + math.log(humedad / 100.0)
-    )
+# =====================================================
+# DETERMINAR ESTADO AMBIENTAL
+# =====================================================
 
-    punto_rocio = (b * alpha) / (a - alpha)
-
-    return round(punto_rocio, 2)
-
-
-# ============================================================
-# ESTADO DE HELADA
-# ============================================================
-
-def determinar_estado(temperatura, punto_rocio):
-
-    if temperatura is None:
-        return "NORMAL"
+def determinar_estado(
+    temperatura_ds,
+    punto_rocio
+):
 
     if punto_rocio is None:
 
-        if temperatura <= 0:
-            return "HELADA"
-
         return "NORMAL"
 
-    # --------------------------------------------------------
-    # Helada
-    # --------------------------------------------------------
+    if temperatura_ds <= 0.0:
 
-    if temperatura <= 0:
         return "HELADA"
 
-    # --------------------------------------------------------
-    # Riesgo de helada
-    # --------------------------------------------------------
+    diferencia = (
+        temperatura_ds -
+        punto_rocio
+    )
 
-    diferencia = temperatura - punto_rocio
+    if (
+        temperatura_ds <= 3.0
+        and diferencia <= 2.0
+    ):
 
-    if temperatura <= 3 and diferencia <= 2:
         return "RIESGO"
 
     return "NORMAL"
 
 
-# ============================================================
-# GUARDAR REGISTRO EN CSV
-# ============================================================
+# =====================================================
+# CONVERTIR FECHA DE THINGSPEAK
+# =====================================================
 
-def guardar_en_csv(registro):
+def convertir_fecha_thingspeak(fecha_texto):
 
     try:
 
-        fecha = registro.get("fechaHora")
-
-        if not fecha:
-            return
-
-        nodo = registro.get(
-            "nodo",
-            1
+        fecha_utc = datetime.fromisoformat(
+            fecha_texto.replace(
+                "Z",
+                "+00:00"
+            )
         )
 
-        # ----------------------------------------------------
-        # Año y mes
+        zona_argentina = timezone(
+            timedelta(hours=-3)
+        )
+
+        fecha_local = fecha_utc.astimezone(
+            zona_argentina
+        )
+
+        return fecha_local.strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+
+    except Exception:
+
+        return datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+
+
+# =====================================================
+# CONVERTIR FECHA DE THINGSPEAK A DATETIME
+# =====================================================
+
+def obtener_datetime_thingspeak(fecha_texto):
+
+    try:
+
+        fecha_utc = datetime.fromisoformat(
+            fecha_texto.replace(
+                "Z",
+                "+00:00"
+            )
+        )
+
+        return fecha_utc
+
+    except Exception:
+
+        return None
+
+
+# =====================================================
+# CORREGIR CSV EXISTENTES
+# =====================================================
+
+def corregir_csv_existentes():
+
+    carpeta = "registros"
+
+    # -----------------------------------------
+    # Si la carpeta no existe, no hay nada
+    # que corregir
+    # -----------------------------------------
+
+    if not os.path.exists(carpeta):
+
+        return
+
+    # -----------------------------------------
+    # Recorrer archivos de la carpeta
+    # -----------------------------------------
+
+    for nombre_archivo in os.listdir(carpeta):
+
+        if not nombre_archivo.endswith(".csv"):
+
+            continue
+
+        ruta = os.path.join(
+            carpeta,
+            nombre_archivo
+        )
+
+        try:
+
+            # ---------------------------------
+            # Leer CSV existente
+            # ---------------------------------
+
+            with open(
+                ruta,
+                mode="r",
+                encoding="utf-8-sig",
+                newline=""
+            ) as archivo:
+
+                contenido = archivo.read()
+
+            # ---------------------------------
+            # Ignorar archivo vacío
+            # ---------------------------------
+
+            if not contenido.strip():
+
+                continue
+
+            # ---------------------------------
+            # Si ya tiene ; como separador,
+            # no hacer nada
+            # ---------------------------------
+
+            if ";" in contenido:
+
+                print(
+                    f"✓ CSV ya corregido: "
+                    f"{nombre_archivo}"
+                )
+
+                continue
+
+            # ---------------------------------
+            # Archivo temporal
+            # ---------------------------------
+
+            ruta_temporal = (
+                ruta +
+                ".tmp"
+            )
+
+            # ---------------------------------
+            # Leer CSV con coma y escribir
+            # CSV nuevo con ;
+            # ---------------------------------
+
+            with open(
+                ruta,
+                mode="r",
+                encoding="utf-8-sig",
+                newline=""
+            ) as archivo_entrada:
+
+                lector = csv.reader(
+                    archivo_entrada,
+                    delimiter=","
+                )
+
+                with open(
+                    ruta_temporal,
+                    mode="w",
+                    encoding="utf-8-sig",
+                    newline=""
+                ) as archivo_salida:
+
+                    escritor = csv.writer(
+                        archivo_salida,
+                        delimiter=";"
+                    )
+
+                    for fila in lector:
+
+                        escritor.writerow(fila)
+
+            # ---------------------------------
+            # Reemplazar archivo original
+            # ---------------------------------
+
+            os.replace(
+                ruta_temporal,
+                ruta
+            )
+
+            print(
+                f"✓ CSV convertido: "
+                f"{nombre_archivo}"
+            )
+
+        except Exception as e:
+
+            print(
+                f"⚠ Error convirtiendo "
+                f"{nombre_archivo}: {e}"
+            )
+
+            # ---------------------------------
+            # Eliminar temporal si quedó
+            # ---------------------------------
+
+            ruta_temporal = (
+                ruta +
+                ".tmp"
+            )
+
+            if os.path.exists(
+                ruta_temporal
+            ):
+
+                try:
+
+                    os.remove(
+                        ruta_temporal
+                    )
+
+                except Exception:
+
+                    pass
+
+
+# =====================================================
+# OBTENER ENTRY IDS YA GUARDADOS EN LOS CSV
+# =====================================================
+
+def obtener_entry_ids_csv():
+
+    ids = set()
+
+    carpeta = "registros"
+
+    if not os.path.exists(carpeta):
+
+        return ids
+
+    for nombre_archivo in os.listdir(carpeta):
+
+        if not nombre_archivo.endswith(".csv"):
+
+            continue
+
+        ruta = os.path.join(
+            carpeta,
+            nombre_archivo
+        )
+
+        try:
+
+            with open(
+                ruta,
+                mode="r",
+                encoding="utf-8-sig",
+                newline=""
+            ) as archivo:
+
+                lector = csv.DictReader(
+                    archivo,
+                    delimiter=";"
+                )
+
+                for fila in lector:
+
+                    medicion = fila.get(
+                        "Medicion"
+                    )
+
+                    if medicion:
+
+                        try:
+
+                            ids.add(
+                                int(medicion)
+                            )
+
+                        except Exception:
+
+                            pass
+
+        except Exception as e:
+
+            print(
+                f"⚠ Error leyendo "
+                f"{nombre_archivo}: {e}"
+            )
+
+    print(
+        f"✓ Entry IDs existentes en CSV: "
+        f"{len(ids)}"
+    )
+
+    return ids
+
+
+# =====================================================
+# ENTRY IDS GUARDADOS
+# =====================================================
+
+entry_ids_csv = set()
+
+
+# =====================================================
+# GUARDAR EN CSV MENSUAL
+# =====================================================
+
+def guardar_en_csv(registro):
+
+    global entry_ids_csv
+
+    try:
+
+        # -----------------------------------------
+        # Obtener Entry ID / medición
+        # -----------------------------------------
+
+        medicion = registro.get(
+            "medicion"
+        )
+
+        try:
+
+            medicion_int = int(
+                medicion
+            )
+
+        except Exception:
+
+            medicion_int = None
+
+        # -----------------------------------------
+        # Evitar duplicados
+        # -----------------------------------------
+
+        if (
+            medicion_int is not None
+            and medicion_int in entry_ids_csv
+        ):
+
+            return
+
+        # -----------------------------------------
+        # Crear carpeta si no existe
+        # -----------------------------------------
+
+        if not os.path.exists(
+            "registros"
+        ):
+
+            os.makedirs(
+                "registros"
+            )
+
+        # -----------------------------------------
+        # Obtener fecha
+        # -----------------------------------------
+
+        fecha = registro.get(
+            "fechaHora",
+            ""
+        )
+
+        if not fecha:
+
+            return
+
+        # -----------------------------------------
+        # Obtener año y mes
         #
         # Ejemplo:
         # 2026-09-24 15:20:04
         #
         # queda:
         # 2026-09
-        # ----------------------------------------------------
+        # -----------------------------------------
 
         anio_mes = fecha[:7]
 
-        # ----------------------------------------------------
-        # Archivo mensual por nodo
-        # ----------------------------------------------------
-
         nombre_archivo = (
-            f"registros/historial_NODO{nodo}_{anio_mes}.csv"
+            f"registros/"
+            f"historial_{anio_mes}.csv"
         )
 
-        os.makedirs(
-            "registros",
-            exist_ok=True
-        )
+        # -----------------------------------------
+        # Determinar si el archivo ya existe
+        # -----------------------------------------
 
-        archivo_nuevo = not os.path.exists(
+        archivo_existe = os.path.exists(
             nombre_archivo
         )
 
+        # -----------------------------------------
+        # Abrir archivo
+        # -----------------------------------------
+
         with open(
             nombre_archivo,
-            "a",
+            mode="a",
             newline="",
             encoding="utf-8-sig"
         ) as archivo:
@@ -180,11 +521,11 @@ def guardar_en_csv(registro):
                 delimiter=";"
             )
 
-            # ------------------------------------------------
-            # Encabezado
-            # ------------------------------------------------
+            # -------------------------------------
+            # Escribir encabezado si es nuevo
+            # -------------------------------------
 
-            if archivo_nuevo:
+            if not archivo_existe:
 
                 escritor.writerow([
                     "FechaHora",
@@ -197,287 +538,227 @@ def guardar_en_csv(registro):
                     "Estado"
                 ])
 
-            # ------------------------------------------------
-            # Convertir números al formato del CSV
-            #
-            # 10.95
-            # ↓
-            # 10,95
-            # ------------------------------------------------
-
-            def numero_csv(valor):
-
-                if valor is None:
-                    return ""
-
-                try:
-
-                    return (
-                        f"{float(valor):.2f}"
-                        .replace(".", ",")
-                    )
-
-                except:
-
-                    return ""
-
-            # ------------------------------------------------
-            # Escribir registro
-            # ------------------------------------------------
+            # -------------------------------------
+            # Escribir medición
+            # -------------------------------------
 
             escritor.writerow([
-
-                fecha,
-
-                nodo,
-
                 registro.get(
-                    "medicion",
+                    "fechaHora",
                     ""
                 ),
 
-                numero_csv(
-                    registro.get(
-                        "temperaturaDS"
-                    )
+                registro.get(
+                    "nodo",
+                    1
                 ),
 
-                numero_csv(
-                    registro.get(
-                        "temperaturaDHT"
-                    )
+                registro.get(
+                    "medicion",
+                    0
                 ),
 
-                numero_csv(
-                    registro.get(
-                        "humedad"
-                    )
+                registro.get(
+                    "temperaturaDS",
+                    0.0
                 ),
 
-                numero_csv(
-                    registro.get(
-                        "puntoRocio"
-                    )
+                registro.get(
+                    "temperaturaDHT",
+                    0.0
+                ),
+
+                registro.get(
+                    "humedad",
+                    0.0
+                ),
+
+                registro.get(
+                    "puntoRocio",
+                    0.0
                 ),
 
                 registro.get(
                     "estado",
-                    ""
+                    "NORMAL"
                 )
             ])
 
+        # -----------------------------------------
+        # Registrar Entry ID como guardado
+        # -----------------------------------------
+
+        if medicion_int is not None:
+
+            entry_ids_csv.add(
+                medicion_int
+            )
+
         print(
-            f"[CSV] Registro guardado: "
+            f"✓ Registro guardado en "
             f"{nombre_archivo}"
         )
 
     except Exception as e:
 
         print(
-            f"[CSV] Error guardando registro: {e}"
+            f"⚠ Error al guardar en CSV: {e}"
         )
 
 
-# ============================================================
-# CONVERTIR FECHA THINGSPEAK A HORA ARGENTINA
-# ============================================================
+# =====================================================
+# PROCESAR REGISTRO DE THINGSPEAK
+# =====================================================
 
-def convertir_fecha_argentina(fecha_utc):
+def procesar_registro_thingspeak(
+    registro_ts
+):
 
     try:
 
-        fecha = datetime.fromisoformat(
-            fecha_utc.replace(
-                "Z",
-                "+00:00"
-            )
+        # -----------------------------------------
+        # Obtener Fields
+        # -----------------------------------------
+
+        field1 = registro_ts.get(
+            "field1"
         )
 
-        zona_argentina = timezone(
-            timedelta(hours=-3)
+        field2 = registro_ts.get(
+            "field2"
         )
 
-        fecha_argentina = fecha.astimezone(
-            zona_argentina
+        field3 = registro_ts.get(
+            "field3"
         )
 
-        return fecha_argentina.strftime(
-            "%Y-%m-%d %H:%M:%S"
+        # -----------------------------------------
+        # Verificar Field 1
+        # -----------------------------------------
+
+        if field1 is None:
+
+            print(
+                "⚠ ThingSpeak: "
+                "Field 1 vacío"
+            )
+
+            return None
+
+        # -----------------------------------------
+        # Verificar Field 2
+        # -----------------------------------------
+
+        if field2 is None:
+
+            print(
+                "⚠ ThingSpeak: "
+                "Field 2 vacío"
+            )
+
+            return None
+
+        # -----------------------------------------
+        # Verificar Field 3
+        # -----------------------------------------
+
+        if field3 is None:
+
+            print(
+                "⚠ ThingSpeak: "
+                "Field 3 vacío"
+            )
+
+            return None
+
+        # -----------------------------------------
+        # Convertir valores
+        # -----------------------------------------
+
+        temperatura_ds = float(
+            field1
         )
 
-    except Exception as e:
-
-        print(
-            f"[FECHA] Error convirtiendo fecha: {e}"
+        temperatura_dht = float(
+            field2
         )
 
-        return fecha_utc
+        humedad = float(
+            field3
+        )
 
+        # -----------------------------------------
+        # Calcular punto de rocío
+        # -----------------------------------------
 
-# ============================================================
-# PROCESAR REGISTRO THINGSPEAK
-# ============================================================
+        punto_rocio = calcular_punto_rocio(
+            temperatura_dht,
+            humedad
+        )
 
-def procesar_registro_thingspeak(feed):
-
-    try:
-
-        # ----------------------------------------------------
-        # Actualmente tenemos solamente Nodo 1
-        # ----------------------------------------------------
-
-        nodo = 1
-
-        # ----------------------------------------------------
-        # Temperatura DS18B20
-        # ----------------------------------------------------
-
-        temperatura_ds = None
-
-        if feed.get("field1") not in [
-            None,
-            ""
-        ]:
-
-            temperatura_ds = float(
-                feed["field1"]
-            )
-
-        # ----------------------------------------------------
-        # Temperatura DHT22
-        # ----------------------------------------------------
-
-        temperatura_dht = None
-
-        if feed.get("field2") not in [
-            None,
-            ""
-        ]:
-
-            temperatura_dht = float(
-                feed["field2"]
-            )
-
-        # ----------------------------------------------------
-        # Humedad DHT22
-        # ----------------------------------------------------
-
-        humedad = None
-
-        if feed.get("field3") not in [
-            None,
-            ""
-        ]:
-
-            humedad = float(
-                feed["field3"]
-            )
-
-        # ----------------------------------------------------
-        # Punto de rocío
-        # ----------------------------------------------------
-
-        punto_rocio = None
-
-        if (
-            temperatura_dht is not None
-            and humedad is not None
-        ):
-
-            punto_rocio = calcular_punto_rocio(
-                temperatura_dht,
-                humedad
-            )
-
-        # ----------------------------------------------------
-        # Temperatura utilizada para determinar el estado
-        #
-        # Primero DS18B20.
-        # Si no existe, DHT22.
-        # ----------------------------------------------------
-
-        temperatura_para_estado = temperatura_ds
-
-        if temperatura_para_estado is None:
-
-            temperatura_para_estado = (
-                temperatura_dht
-            )
+        # -----------------------------------------
+        # Determinar estado
+        # -----------------------------------------
 
         estado = determinar_estado(
-            temperatura_para_estado,
+            temperatura_ds,
             punto_rocio
         )
 
-        # ----------------------------------------------------
-        # Fecha
-        # ----------------------------------------------------
+        # -----------------------------------------
+        # Convertir fecha
+        # -----------------------------------------
 
-        fecha_utc = feed.get(
-            "created_at",
-            ""
+        fecha_hora = convertir_fecha_thingspeak(
+            registro_ts.get(
+                "created_at",
+                ""
+            )
         )
 
-        fecha_hora = convertir_fecha_argentina(
-            fecha_utc
-        )
-
-        # ----------------------------------------------------
+        # -----------------------------------------
         # Entry ID de ThingSpeak
-        # ----------------------------------------------------
+        # -----------------------------------------
 
-        entry_id = feed.get(
-            "entry_id",
-            ""
+        medicion = int(
+            registro_ts.get(
+                "entry_id",
+                0
+            )
         )
 
-        # Actualmente utilizamos entry_id como medición
-        medicion = entry_id
-
-        # ----------------------------------------------------
+        # -----------------------------------------
         # Crear registro
-        # ----------------------------------------------------
+        # -----------------------------------------
 
         registro = {
 
-            "nodo": nodo,
+            "fechaHora":
+                fecha_hora,
 
-            "medicion": medicion,
+            "nodo":
+                1,
 
-            "temperaturaDS": (
-                round(
-                    temperatura_ds,
-                    2
-                )
-                if temperatura_ds is not None
-                else None
-            ),
+            "medicion":
+                medicion,
 
-            "temperaturaDHT": (
-                round(
-                    temperatura_dht,
-                    2
-                )
-                if temperatura_dht is not None
-                else None
-            ),
+            "temperaturaDS":
+                temperatura_ds,
 
-            "humedad": (
-                round(
-                    humedad,
-                    2
-                )
-                if humedad is not None
-                else None
-            ),
+            "temperaturaDHT":
+                temperatura_dht,
 
-            "puntoRocio": punto_rocio,
+            "humedad":
+                humedad,
 
-            "estado": estado,
+            "puntoRocio":
+                punto_rocio,
 
-            "fechaHora": fecha_hora,
+            "estado":
+                estado,
 
-            "conectado": True
+            "conectado":
+                True
         }
 
         return registro
@@ -485,49 +766,53 @@ def procesar_registro_thingspeak(feed):
     except Exception as e:
 
         print(
-            f"[THINGSPEAK] Error procesando "
-            f"registro: {e}"
+            f"⚠ Error procesando registro "
+            f"de ThingSpeak: {e}"
         )
 
         return None
 
 
-# ============================================================
-# CARGAR HISTORIAL INICIAL DESDE THINGSPEAK
-# ============================================================
+# =====================================================
+# CARGAR HISTORIAL DE THINGSPEAK AL INICIAR
+# =====================================================
 
 def cargar_historial_inicial():
 
     global ultimo_entry_id_procesado
 
     print(
-        "[THINGSPEAK] Cargando historial inicial..."
+        "\n========================================"
+    )
+
+    print(
+        "   CARGANDO HISTORIAL DE THINGSPEAK"
+    )
+
+    print(
+        "========================================"
     )
 
     try:
 
         url = (
             "https://api.thingspeak.com/"
-            f"channels/{THINGSPEAK_CHANNEL_ID}/feeds.json"
+            f"channels/"
+            f"{THINGSPEAK_CHANNEL_ID}/"
+            "feeds.json"
         )
 
+        # ThingSpeak permite solicitar hasta 8000
+        # registros en una consulta.
         parametros = {
-            "results": CANTIDAD_HISTORIAL_INICIAL
+            "results": 8000
         }
-
-        # ----------------------------------------------------
-        # Agregar API KEY si existe
-        # ----------------------------------------------------
 
         if THINGSPEAK_READ_API_KEY:
 
-            parametros[
-                "api_key"
-            ] = THINGSPEAK_READ_API_KEY
-
-        # ----------------------------------------------------
-        # Consultar ThingSpeak
-        # ----------------------------------------------------
+            parametros["api_key"] = (
+                THINGSPEAK_READ_API_KEY
+            )
 
         respuesta = requests.get(
             url,
@@ -547,23 +832,35 @@ def cargar_historial_inicial():
         if not feeds:
 
             print(
-                "[THINGSPEAK] "
-                "No hay historial disponible"
+                "⚠ No hay registros históricos "
+                "en ThingSpeak."
             )
+
+            datos_actuales[1] = {
+                "nodo": 1,
+                "conectado": False,
+                "estado": "NORMAL",
+                "mensaje": "Sin datos"
+            }
 
             return
 
-        # ----------------------------------------------------
-        # Limpiar historial
-        # ----------------------------------------------------
+        print(
+            f"✓ ThingSpeak devolvió "
+            f"{len(feeds)} registros."
+        )
 
-        historial.clear()
+        registros_cargados = 0
 
-        cantidad_procesada = 0
+        ultimo_registro = None
 
-        # ----------------------------------------------------
-        # Procesar registros históricos
-        # ----------------------------------------------------
+        # -----------------------------------------
+        # ThingSpeak entrega los registros desde
+        # el más antiguo hasta el más reciente.
+        #
+        # Los procesamos en ese orden para que
+        # el CSV quede cronológico.
+        # -----------------------------------------
 
         for feed in feeds:
 
@@ -574,81 +871,154 @@ def cargar_historial_inicial():
             )
 
             if registro is None:
+
                 continue
+
+            registros_cargados += 1
+
+            ultimo_registro = registro
+
+            # -------------------------------------
+            # Agregar al historial
+            # -------------------------------------
 
             historial.append(
                 registro
             )
 
-            cantidad_procesada += 1
+            # -------------------------------------
+            # Guardar en CSV
+            #
+            # guardar_en_csv() evita duplicados.
+            # -------------------------------------
 
-        # ----------------------------------------------------
-        # Mantener máximo 1000 registros
-        # ----------------------------------------------------
+            guardar_en_csv(
+                registro
+            )
+
+        # -----------------------------------------
+        # Mantener máximo 1000 registros en memoria
+        # para el dashboard.
+        #
+        # El CSV conserva todos los registros.
+        # -----------------------------------------
 
         if len(historial) > 1000:
 
-            del historial[
-                :-1000
-            ]
+            historial[:] = historial[-1000:]
 
-        # ----------------------------------------------------
-        # Guardar último Entry ID
-        # ----------------------------------------------------
+        # -----------------------------------------
+        # Configurar último Entry ID
+        # -----------------------------------------
 
-        ultimo_feed = feeds[-1]
+        if ultimo_registro is not None:
 
-        ultimo_entry_id_procesado = (
-            ultimo_feed.get(
-                "entry_id"
-            )
-        )
-
-        # ----------------------------------------------------
-        # Actualizar datos actuales
-        # ----------------------------------------------------
-
-        if historial:
-
-            ultimo_registro = historial[-1]
-
-            nodo = str(
-                ultimo_registro["nodo"]
+            ultimo_entry_id_procesado = (
+                ultimo_registro["medicion"]
             )
 
-            datos_actuales[
-                nodo
-            ] = ultimo_registro
+            datos_actuales[1] = (
+                ultimo_registro
+            )
 
-            ultima_recepcion_nodo[
-                nodo
-            ] = time.time()
+            # -------------------------------------
+            # Determinar conexión según la edad
+            # del último dato.
+            # -------------------------------------
+
+            feed_fecha = feeds[-1].get(
+                "created_at",
+                ""
+            )
+
+            fecha_ultimo_dato = (
+                obtener_datetime_thingspeak(
+                    feed_fecha
+                )
+            )
+
+            if fecha_ultimo_dato is not None:
+
+                ahora_utc = datetime.now(
+                    timezone.utc
+                )
+
+                segundos_desde_ultimo = (
+                    ahora_utc -
+                    fecha_ultimo_dato
+                ).total_seconds()
+
+                if (
+                    segundos_desde_ultimo
+                    <= TIEMPO_DESCONEXION
+                ):
+
+                    datos_actuales[1][
+                        "conectado"
+                    ] = True
+
+                    ultima_recepcion_nodo[1] = (
+                        time.time()
+                        - segundos_desde_ultimo
+                    )
+
+                    print(
+                        "✓ Nodo 1: CONECTADO"
+                    )
+
+                else:
+
+                    datos_actuales[1][
+                        "conectado"
+                    ] = False
+
+                    print(
+                        "⚠ Nodo 1: DESCONECTADO"
+                    )
+
+            else:
+
+                datos_actuales[1][
+                    "conectado"
+                ] = False
 
         print(
-            "[THINGSPEAK] Historial inicial cargado: "
-            f"{cantidad_procesada} registros"
+            f"✓ Registros cargados en memoria: "
+            f"{len(historial)}"
+        )
+
+        print(
+            f"✓ Último Entry ID: "
+            f"{ultimo_entry_id_procesado}"
+        )
+
+        print(
+            "========================================\n"
         )
 
     except requests.exceptions.RequestException as e:
 
         print(
-            "[THINGSPEAK] Error cargando historial: "
-            f"{e}"
+            f"⚠ Error cargando historial "
+            f"de ThingSpeak: {e}"
         )
 
     except Exception as e:
 
         print(
-            "[THINGSPEAK] Error cargando historial: "
-            f"{e}"
+            f"⚠ Error cargando historial: {e}"
         )
 
 
-# ============================================================
-# CONTROL DE CONEXIÓN
-# ============================================================
+# =====================================================
+# ACTUALIZAR ESTADO DE CONEXIÓN
+# =====================================================
 
 def actualizar_estado_conexion():
+
+    print(
+        "✓ Monitor de conexión iniciado"
+    )
 
     while True:
 
@@ -656,106 +1026,126 @@ def actualizar_estado_conexion():
 
             ahora = time.time()
 
-            # ------------------------------------------------
-            # Revisar todos los nodos conocidos
-            # ------------------------------------------------
+            # -----------------------------------------
+            # Actualmente solamente tenemos Nodo 1
+            # -----------------------------------------
 
-            for nodo in list(
-                datos_actuales.keys()
-            ):
+            nodo = 1
 
-                ultima_recepcion = (
-                    ultima_recepcion_nodo.get(
-                        nodo
-                    )
-                )
-
-                if ultima_recepcion is None:
-                    continue
+            if nodo in ultima_recepcion_nodo:
 
                 tiempo_sin_datos = (
-                    ahora - ultima_recepcion
+                    ahora -
+                    ultima_recepcion_nodo[nodo]
                 )
 
-                # ------------------------------------------------
-                # Desconectado
-                # ------------------------------------------------
+                if (
+                    tiempo_sin_datos
+                    > TIEMPO_DESCONEXION
+                ):
 
-                if tiempo_sin_datos > TIEMPO_DESCONEXION:
+                    if nodo in datos_actuales:
 
-                    if datos_actuales[
-                        nodo
-                    ].get("conectado"):
+                        datos_actuales[nodo][
+                            "conectado"
+                        ] = False
 
-                        print(
-                            "[CONEXION] "
-                            f"Nodo {nodo} "
-                            "DESconectado"
-                        )
+            else:
 
-                    datos_actuales[
-                        nodo
-                    ]["conectado"] = False
+                # -------------------------------------
+                # Nunca se recibió ningún dato durante
+                # esta ejecución.
+                # -------------------------------------
 
-                # ------------------------------------------------
-                # Conectado
-                # ------------------------------------------------
+                if nodo in datos_actuales:
 
-                else:
+                    datos_actuales[nodo][
+                        "conectado"
+                    ] = False
 
-                    datos_actuales[
-                        nodo
-                    ]["conectado"] = True
+            time.sleep(10)
 
         except Exception as e:
 
             print(
-                f"[CONEXION] Error: {e}"
+                f"⚠ Error monitorizando "
+                f"conexión: {e}"
             )
 
-        # Revisar cada 5 segundos
-
-        time.sleep(5)
+            time.sleep(10)
 
 
-# ============================================================
+# =====================================================
 # CONSULTAR THINGSPEAK
-# ============================================================
+# =====================================================
 
 def consultar_thingspeak():
 
     global ultimo_entry_id_procesado
 
     print(
-        "[THINGSPEAK] Hilo de consulta iniciado"
+        "\n========================================"
+    )
+
+    print(
+        "   LECTOR THINGSPEAK - NODO 1"
+    )
+
+    print(
+        "========================================"
+    )
+
+    print(
+        f"Canal: "
+        f"{THINGSPEAK_CHANNEL_ID}"
+    )
+
+    print(
+        f"Intervalo: "
+        f"{INTERVALO_THINGSPEAK} segundos"
+    )
+
+    print(
+        f"Desconexión después de: "
+        f"{TIEMPO_DESCONEXION // 60} minutos"
+    )
+
+    print(
+        "========================================\n"
     )
 
     while True:
 
         try:
 
+            # ---------------------------------
+            # URL de ThingSpeak
+            # ---------------------------------
+
             url = (
                 "https://api.thingspeak.com/"
-                f"channels/{THINGSPEAK_CHANNEL_ID}/feeds.json"
+                f"channels/"
+                f"{THINGSPEAK_CHANNEL_ID}/"
+                "feeds.json"
             )
+
+            # ---------------------------------
+            # Parámetros
+            # ---------------------------------
 
             parametros = {
                 "results": 1
             }
 
-            # ------------------------------------------------
-            # API KEY
-            # ------------------------------------------------
-
             if THINGSPEAK_READ_API_KEY:
 
-                parametros[
-                    "api_key"
-                ] = THINGSPEAK_READ_API_KEY
+                parametros["api_key"] = (
+                    THINGSPEAK_READ_API_KEY
+                )
 
-            # ------------------------------------------------
-            # Consulta
-            # ------------------------------------------------
+            # ---------------------------------
+            # Realizar consulta
+            # ---------------------------------
 
             respuesta = requests.get(
                 url,
@@ -772,140 +1162,227 @@ def consultar_thingspeak():
                 []
             )
 
+            # ---------------------------------
+            # Verificar si hay registros
+            # ---------------------------------
+
             if not feeds:
 
                 print(
-                    "[THINGSPEAK] "
-                    "No hay registros"
+                    "⚠ ThingSpeak no devolvió "
+                    "registros."
                 )
 
-            else:
-
-                feed = feeds[-1]
-
-                entry_id = feed.get(
-                    "entry_id"
+                time.sleep(
+                    INTERVALO_THINGSPEAK
                 )
 
-                # ------------------------------------------------
-                # ¿Es un registro nuevo?
-                # ------------------------------------------------
+                continue
 
-                if entry_id != ultimo_entry_id_procesado:
+            # ---------------------------------
+            # Tomar último registro
+            # ---------------------------------
 
-                    registro = (
-                        procesar_registro_thingspeak(
-                            feed
-                        )
-                    )
+            registro_ts = feeds[0]
 
-                    if registro is not None:
+            # ---------------------------------
+            # Obtener Entry ID
+            # ---------------------------------
 
-                        nodo = str(
-                            registro["nodo"]
-                        )
+            entry_id = int(
+                registro_ts.get(
+                    "entry_id",
+                    0
+                )
+            )
 
-                        # ----------------------------------------
-                        # Actualizar datos actuales
-                        # ----------------------------------------
+            # ---------------------------------
+            # Comprobar si ya procesamos
+            # este registro
+            # ---------------------------------
 
-                        datos_actuales[
-                            nodo
-                        ] = registro
+            if (
+                ultimo_entry_id_procesado
+                == entry_id
+            ):
 
-                        # ----------------------------------------
-                        # Guardar hora de recepción
-                        # ----------------------------------------
+                print(
+                    f"ThingSpeak: "
+                    f"sin datos nuevos "
+                    f"(Entry ID "
+                    f"{entry_id})"
+                )
 
-                        ultima_recepcion_nodo[
-                            nodo
-                        ] = time.time()
+                time.sleep(
+                    INTERVALO_THINGSPEAK
+                )
 
-                        # ----------------------------------------
-                        # Agregar al historial
-                        # ----------------------------------------
+                continue
 
-                        historial.append(
-                            registro
-                        )
+            # ---------------------------------
+            # Procesar registro
+            # ---------------------------------
 
-                        # ----------------------------------------
-                        # Limitar historial
-                        # ----------------------------------------
+            registro = (
+                procesar_registro_thingspeak(
+                    registro_ts
+                )
+            )
 
-                        if len(historial) > 1000:
+            # ---------------------------------
+            # Si fue válido
+            # ---------------------------------
 
-                            del historial[
-                                :-1000
-                            ]
+            if registro is not None:
 
-                        # ----------------------------------------
-                        # Guardar CSV
-                        # ----------------------------------------
+                # -----------------------------
+                # Actualizar dato actual
+                # -----------------------------
 
-                        guardar_en_csv(
-                            registro
-                        )
+                datos_actuales[1] = (
+                    registro
+                )
 
-                        # ----------------------------------------
-                        # Actualizar Entry ID
-                        # ----------------------------------------
+                # -----------------------------
+                # Marcar nodo como conectado
+                # -----------------------------
 
-                        ultimo_entry_id_procesado = (
-                            entry_id
-                        )
+                datos_actuales[1][
+                    "conectado"
+                ] = True
 
-                        print(
-                            "[THINGSPEAK] "
-                            f"Nuevo registro: "
-                            f"Nodo {registro['nodo']} | "
-                            f"Medición {registro['medicion']} | "
-                            f"DS18B20 "
-                            f"{registro['temperaturaDS']} °C | "
-                            f"DHT22 "
-                            f"{registro['temperaturaDHT']} °C | "
-                            f"HR "
-                            f"{registro['humedad']} % | "
-                            f"Rocío "
-                            f"{registro['puntoRocio']} °C | "
-                            f"Estado "
-                            f"{registro['estado']}"
-                        )
+                ultima_recepcion_nodo[1] = (
+                    time.time()
+                )
 
-                else:
+                # -----------------------------
+                # Agregar al historial
+                # -----------------------------
+
+                historial.append(
+                    registro
+                )
+
+                # -----------------------------
+                # Mantener historial limitado
+                # -----------------------------
+
+                if len(historial) > 1000:
+
+                    del historial[
+                        :-1000
+                    ]
+
+                # -----------------------------
+                # Guardar CSV
+                # -----------------------------
+
+                guardar_en_csv(
+                    registro
+                )
+
+                # -----------------------------
+                # Actualizar Entry ID
+                # -----------------------------
+
+                ultimo_entry_id_procesado = (
+                    entry_id
+                )
+
+                # -----------------------------
+                # Mostrar información
+                # -----------------------------
+
+                print(
+                    "\n✓ NUEVA MEDICIÓN"
+                )
+
+                print(
+                    f"  Entry ID: "
+                    f"{entry_id}"
+                )
+
+                print(
+                    f"  Fecha: "
+                    f"{registro['fechaHora']}"
+                )
+
+                print(
+                    f"  Nodo: "
+                    f"{registro['nodo']}"
+                )
+
+                print(
+                    f"  DS18B20: "
+                    f"{registro['temperaturaDS']:.2f}"
+                    f" °C"
+                )
+
+                print(
+                    f"  DHT22: "
+                    f"{registro['temperaturaDHT']:.2f}"
+                    f" °C"
+                )
+
+                print(
+                    f"  Humedad: "
+                    f"{registro['humedad']:.2f}"
+                    f" %"
+                )
+
+                if (
+                    registro["puntoRocio"]
+                    is not None
+                ):
 
                     print(
-                        "[THINGSPEAK] "
-                        "Sin registro nuevo"
+                        f"  Punto de rocío: "
+                        f"{registro['puntoRocio']:.2f}"
+                        f" °C"
                     )
+
+                print(
+                    f"  Estado: "
+                    f"{registro['estado']}"
+                )
+
+            # ---------------------------------
+            # Esperar
+            # ---------------------------------
+
+            time.sleep(
+                INTERVALO_THINGSPEAK
+            )
 
         except requests.exceptions.RequestException as e:
 
             print(
-                f"[THINGSPEAK] Error de conexión: {e}"
+                f"⚠ Error HTTP consultando "
+                f"ThingSpeak: {e}"
+            )
+
+            time.sleep(
+                INTERVALO_THINGSPEAK
             )
 
         except Exception as e:
 
             print(
-                f"[THINGSPEAK] Error: {e}"
+                f"⚠ Error en lector "
+                f"ThingSpeak: {e}"
             )
 
-        # ----------------------------------------------------
-        # Esperar
-        # ----------------------------------------------------
-
-        time.sleep(
-            INTERVALO_THINGSPEAK
-        )
+            time.sleep(
+                INTERVALO_THINGSPEAK
+            )
 
 
-# ============================================================
-# RUTA PRINCIPAL
-# ============================================================
+# =====================================================
+# RUTAS DE LA PÁGINA WEB
+# =====================================================
 
 @app.route("/")
-def inicio():
+def pagina_principal():
 
     return send_from_directory(
         ".",
@@ -913,12 +1390,8 @@ def inicio():
     )
 
 
-# ============================================================
-# CSS
-# ============================================================
-
 @app.route("/estilo.css")
-def estilo_css():
+def estilo():
 
     return send_from_directory(
         ".",
@@ -926,22 +1399,14 @@ def estilo_css():
     )
 
 
-# ============================================================
-# JAVASCRIPT
-# ============================================================
-
 @app.route("/script.js")
-def script_js():
+def javascript():
 
     return send_from_directory(
         ".",
         "script.js"
     )
 
-
-# ============================================================
-# LOGO UNCO
-# ============================================================
 
 @app.route("/logo-unco.jpg")
 def logo_unco():
@@ -952,10 +1417,6 @@ def logo_unco():
     )
 
 
-# ============================================================
-# LOGO FAIN
-# ============================================================
-
 @app.route("/logo-fain.jpg")
 def logo_fain():
 
@@ -964,10 +1425,6 @@ def logo_fain():
         "logo-fain.jpg"
     )
 
-
-# ============================================================
-# LOGO FACA
-# ============================================================
 
 @app.route("/logo-faca.jpg")
 def logo_faca():
@@ -978,11 +1435,14 @@ def logo_faca():
     )
 
 
-# ============================================================
+# =====================================================
 # DATOS ACTUALES
-# ============================================================
+# =====================================================
 
-@app.route("/datos")
+@app.route(
+    "/datos",
+    methods=["GET"]
+)
 def obtener_datos():
 
     return jsonify(
@@ -990,11 +1450,14 @@ def obtener_datos():
     )
 
 
-# ============================================================
+# =====================================================
 # HISTORIAL
-# ============================================================
+# =====================================================
 
-@app.route("/historial")
+@app.route(
+    "/historial",
+    methods=["GET"]
+)
 def obtener_historial():
 
     return jsonify(
@@ -1002,142 +1465,260 @@ def obtener_historial():
     )
 
 
-# ============================================================
-# LISTA DE ARCHIVOS CSV
-# ============================================================
+# =====================================================
+# LISTAR ARCHIVOS CSV
+# =====================================================
 
-@app.route("/api/archivos-csv")
+@app.route(
+    "/api/archivos-csv",
+    methods=["GET"]
+)
 def listar_archivos_csv():
 
-    carpeta = "registros"
+    if not os.path.exists(
+        "registros"
+    ):
 
-    archivos = []
+        return jsonify([])
 
-    if os.path.exists(carpeta):
+    archivos = sorted(
+        os.listdir("registros"),
+        reverse=True
+    )
 
-        for nombre_archivo in os.listdir(carpeta):
+    archivos_csv = []
 
-            if nombre_archivo.lower().endswith(".csv"):
+    for archivo in archivos:
 
-                ruta = os.path.join(
-                    carpeta,
-                    nombre_archivo
-                )
+        if archivo.endswith(".csv"):
 
-                if os.path.isfile(ruta):
-
-                    archivos.append(
-                        nombre_archivo
-                    )
-
-    archivos.sort()
+            archivos_csv.append(
+                archivo
+            )
 
     return jsonify(
-        archivos
+        archivos_csv
     )
 
 
-# ============================================================
+# =====================================================
 # DESCARGAR CSV
-# ============================================================
+# =====================================================
 
-@app.route("/descargar/<nombre_archivo>")
-def descargar_csv(nombre_archivo):
+@app.route(
+    "/descargar/<nombre_archivo>"
+)
+def descargar_csv(
+    nombre_archivo
+):
 
-    carpeta = "registros"
-
-    ruta = os.path.join(
-        carpeta,
-        nombre_archivo
+    return send_from_directory(
+        "registros",
+        nombre_archivo,
+        as_attachment=True
     )
 
-    # --------------------------------------------------------
-    # Verificar que exista
-    # --------------------------------------------------------
 
-    if not os.path.isfile(ruta):
+# =====================================================
+# RECIBIR MEDICIÓN POR POST
+# =====================================================
 
-        return (
-            "Archivo no encontrado",
-            404
+@app.route(
+    "/api/medicion",
+    methods=["POST"]
+)
+def recibir_medicion():
+
+    from flask import request
+
+    try:
+
+        data = request.get_json()
+
+        # -----------------------------------------
+        # Obtener nodo
+        # -----------------------------------------
+
+        nodo = int(
+            data.get(
+                "nodo",
+                1
+            )
         )
 
-    return send_file(
-        ruta,
-        as_attachment=True,
-        download_name=nombre_archivo,
-        mimetype="text/csv"
-    )
+        # -----------------------------------------
+        # Fecha
+        # -----------------------------------------
 
+        if (
+            "fechaHora" not in data
+            or not data["fechaHora"]
+        ):
 
-# ============================================================
-# API DE MEDICIÓN
-# ============================================================
+            data["fechaHora"] = (
+                datetime.now().strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+            )
 
-@app.route("/api/medicion")
-def api_medicion():
+        # -----------------------------------------
+        # Temperatura DS18B20
+        # -----------------------------------------
 
-    if not datos_actuales:
+        temperatura_ds = float(
+            data.get(
+                "temperaturaDS",
+                0
+            )
+        )
+
+        # -----------------------------------------
+        # Temperatura DHT22
+        # -----------------------------------------
+
+        temperatura_dht = float(
+            data.get(
+                "temperaturaDHT",
+                0
+            )
+        )
+
+        # -----------------------------------------
+        # Humedad
+        # -----------------------------------------
+
+        humedad = float(
+            data.get(
+                "humedad",
+                0
+            )
+        )
+
+        # -----------------------------------------
+        # Punto de rocío
+        # -----------------------------------------
+
+        if (
+            "puntoRocio" not in data
+            or data["puntoRocio"] is None
+        ):
+
+            data["puntoRocio"] = (
+                calcular_punto_rocio(
+                    temperatura_dht,
+                    humedad
+                )
+            )
+
+        # -----------------------------------------
+        # Estado
+        # -----------------------------------------
+
+        if (
+            "estado" not in data
+            or not data["estado"]
+        ):
+
+            data["estado"] = (
+                determinar_estado(
+                    temperatura_ds,
+                    data["puntoRocio"]
+                )
+            )
+
+        # -----------------------------------------
+        # Estado de conexión
+        # -----------------------------------------
+
+        data["conectado"] = True
+
+        ultima_recepcion_nodo[nodo] = (
+            time.time()
+        )
+
+        # -----------------------------------------
+        # Guardar en memoria
+        # -----------------------------------------
+
+        datos_actuales[nodo] = data
+
+        historial.append(
+            data
+        )
+
+        # -----------------------------------------
+        # Guardar CSV
+        # -----------------------------------------
+
+        guardar_en_csv(
+            data
+        )
+
+        # -----------------------------------------
+        # Respuesta
+        # -----------------------------------------
 
         return jsonify({
-            "conectado": False,
-            "mensaje": "Sin datos"
-        })
 
-    # Nodo 1 actualmente
+            "status":
+                "ok",
 
-    if "1" in datos_actuales:
+            "message":
+                "Datos recibidos correctamente"
 
-        return jsonify(
-            datos_actuales["1"]
-        )
+        }), 200
 
-    return jsonify({
-        "conectado": False,
-        "mensaje": "Nodo no disponible"
-    })
+    except Exception as e:
+
+        return jsonify({
+
+            "status":
+                "error",
+
+            "message":
+                str(e)
+
+        }), 400
 
 
-# ============================================================
-# INICIO
-# ============================================================
+# =====================================================
+# INICIO DEL SERVIDOR
+# =====================================================
 
 if __name__ == "__main__":
 
-    print(
-        "=============================================="
-    )
-
-    print(
-        "       MONITOREO DE HELADAS"
-    )
-
-    print(
-        "       ThingSpeak + Flask"
-    )
-
-    print(
-        "=============================================="
-    )
-
-    # --------------------------------------------------------
+    # -----------------------------------------
     # Crear carpeta de registros
-    # --------------------------------------------------------
+    # -----------------------------------------
 
     os.makedirs(
         "registros",
         exist_ok=True
     )
 
-    # --------------------------------------------------------
-    # Cargar historial de ThingSpeak
-    # --------------------------------------------------------
+    # -----------------------------------------
+    # Corregir CSV existentes
+    # -----------------------------------------
+
+    corregir_csv_existentes()
+
+    # -----------------------------------------
+    # Leer Entry IDs que ya existen en CSV
+    # -----------------------------------------
+
+    entry_ids_csv = (
+        obtener_entry_ids_csv()
+    )
+
+    # -----------------------------------------
+    # Cargar historial completo de ThingSpeak
+    # -----------------------------------------
 
     cargar_historial_inicial()
 
-    # --------------------------------------------------------
-    # Iniciar hilo de ThingSpeak
-    # --------------------------------------------------------
+    # -----------------------------------------
+    # Iniciar lector de ThingSpeak
+    # -----------------------------------------
 
     hilo_thingspeak = threading.Thread(
         target=consultar_thingspeak,
@@ -1146,9 +1727,9 @@ if __name__ == "__main__":
 
     hilo_thingspeak.start()
 
-    # --------------------------------------------------------
-    # Iniciar control de conexión
-    # --------------------------------------------------------
+    # -----------------------------------------
+    # Iniciar monitor de conexión
+    # -----------------------------------------
 
     hilo_conexion = threading.Thread(
         target=actualizar_estado_conexion,
@@ -1157,19 +1738,79 @@ if __name__ == "__main__":
 
     hilo_conexion.start()
 
-    # --------------------------------------------------------
-    # Iniciar Flask
-    # --------------------------------------------------------
+    # -----------------------------------------
+    # Puerto de Render
+    # -----------------------------------------
 
-    puerto = int(
+    port = int(
         os.environ.get(
             "PORT",
             5000
         )
     )
 
+    # -----------------------------------------
+    # Mensajes de inicio
+    # -----------------------------------------
+
+    print(
+        "\n========================================"
+    )
+
+    print(
+        "   SERVIDOR WEB - MONITOREO HELADAS"
+    )
+
+    print(
+        "========================================"
+    )
+
+    print("")
+
+    print(
+        " -> Fuente de datos: ThingSpeak"
+    )
+
+    print(
+        f" -> Canal: "
+        f"{THINGSPEAK_CHANNEL_ID}"
+    )
+
+    print(
+        " -> Nodo activo: Nodo 1"
+    )
+
+    print(
+        " -> Historial ThingSpeak: hasta 8000 registros"
+    )
+
+    print(
+        " -> CSV: separado por punto y coma (;)"
+    )
+
+    print(
+        " -> Codificación: UTF-8-SIG"
+    )
+
+    print(
+        f" -> Desconexión: "
+        f"{TIEMPO_DESCONEXION // 60} minutos"
+    )
+
+    print(
+        " -> Flask escuchando en puerto:",
+        port
+    )
+
+    print(
+        "========================================\n"
+    )
+
+    # -----------------------------------------
+    # Iniciar Flask
+    # -----------------------------------------
+
     app.run(
         host="0.0.0.0",
-        port=puerto,
-        debug=False
+        port=port
     )
