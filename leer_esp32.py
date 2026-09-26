@@ -2029,13 +2029,17 @@ def descargar_csv(
         f"nodo_{nodo}"
     )
 
+    nombre_descarga = (
+        f"historial_nodo{nodo}_"
+        f"{nombre_archivo.replace('historial_', '')}"
+    )
+
     return send_from_directory(
         carpeta,
         nombre_archivo,
-        as_attachment=True
+        as_attachment=True,
+        download_name=nombre_descarga
     )
-
-
 # =====================================================
 # RECIBIR MEDICIÓN POR POST
 # =====================================================
