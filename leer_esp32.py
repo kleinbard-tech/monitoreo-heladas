@@ -98,9 +98,6 @@ app = Flask(__name__)
 # =====================================================
 
 # Tenemos dos nodos.
-#
-# Esto nos permite recorrerlos de forma ordenada
-# en las diferentes funciones del programa.
 NODOS = [1, 2]
 
 
@@ -109,12 +106,6 @@ NODOS = [1, 2]
 # =====================================================
 
 # Último dato real recibido de cada nodo.
-#
-# Ejemplo:
-#
-# datos_actuales[1]
-# datos_actuales[2]
-#
 datos_actuales = {}
 
 
@@ -122,9 +113,9 @@ datos_actuales = {}
 # HISTORIAL PROCESADO
 # =====================================================
 
-# Acá no guardamos todas las mediciones de ThingSpeak.
+# Acá guardamos solamente los registros de 5 minutos.
 #
-# Guardamos solamente los registros de 5 minutos.
+# Contiene datos de Nodo 1 y Nodo 2.
 historial = []
 
 
@@ -132,19 +123,7 @@ historial = []
 # ÚLTIMO ENTRY ID PROCESADO
 # =====================================================
 
-# IMPORTANTE:
-#
-# Cada canal de ThingSpeak tiene su propia numeración
-# de Entry ID.
-#
-# Por eso NO podemos tener una sola variable.
-#
-# Nodo 1:
-# ultimo_entry_id_procesado[1]
-#
-# Nodo 2:
-# ultimo_entry_id_procesado[2]
-#
+# Cada canal de ThingSpeak tiene su propia numeración.
 ultimo_entry_id_procesado = {
 
     1: None,
@@ -160,8 +139,6 @@ ultimo_entry_id_procesado = {
 
 # Guarda el momento en que Python recibió el último
 # dato de cada nodo.
-#
-# Se utiliza para determinar si el nodo está conectado.
 ultima_recepcion_nodo = {}
 
 
@@ -170,15 +147,6 @@ ultima_recepcion_nodo = {}
 # =====================================================
 
 # Cada nodo tiene su propia lista.
-#
-# Nodo 1:
-#
-# mediciones_pendientes[1]
-#
-# Nodo 2:
-#
-# mediciones_pendientes[2]
-#
 mediciones_pendientes = {
 
     1: [],
@@ -192,10 +160,7 @@ mediciones_pendientes = {
 # MEDICIONES YA UTILIZADAS
 # =====================================================
 
-# Los Entry ID también se mantienen separados.
-#
-# Un Entry ID del Nodo 1 no debe compararse con
-# uno del Nodo 2.
+# Los Entry ID se mantienen separados por nodo.
 entry_ids_utilizados = {
 
     1: set(),
@@ -628,7 +593,31 @@ def guardar_en_csv(
 
             return
 
-        carpeta = "registros_5min"
+        # =================================================
+        # OBTENER NODO
+        # =================================================
+
+        nodo = registro.get(
+            "nodo",
+            1
+        )
+
+        if nodo not in NODOS:
+
+            print(
+                f"⚠ Nodo inválido al guardar CSV: {nodo}"
+            )
+
+            return
+
+        # =================================================
+        # CARPETA DEL NODO
+        # =================================================
+
+        carpeta = (
+            f"registros_5min/"
+            f"nodo_{nodo}"
+        )
 
         if not os.path.exists(
             carpeta
@@ -637,6 +626,10 @@ def guardar_en_csv(
             os.makedirs(
                 carpeta
             )
+
+        # =================================================
+        # ARCHIVO MENSUAL DEL NODO
+        # =================================================
 
         anio_mes = fecha[:7]
 
@@ -650,6 +643,10 @@ def guardar_en_csv(
                 nombre_archivo
             )
         )
+
+        # =================================================
+        # ESCRIBIR CSV
+        # =================================================
 
         with open(
             nombre_archivo,
@@ -1109,7 +1106,7 @@ def cargar_historial_nodo(
 
     print()
     print(
-        f"----------------------------------------"
+        "----------------------------------------"
     )
 
     print(
@@ -1117,7 +1114,7 @@ def cargar_historial_nodo(
     )
 
     print(
-        f"----------------------------------------"
+        "----------------------------------------"
     )
 
     configuracion = (
@@ -1370,6 +1367,10 @@ def cargar_historial_nodo(
             f"Nodo {nodo}: {e}"
         )
 
+
+# =====================================================
+# CARGAR HISTORIAL INICIAL
+# =====================================================
 
 def cargar_historial_inicial():
 
@@ -1957,20 +1958,42 @@ def listar_archivos_csv():
 
         return jsonify([])
 
-    archivos = sorted(
-        os.listdir(carpeta),
-        reverse=True
-    )
-
     archivos_csv = []
 
-    for archivo in archivos:
+    # =================================================
+    # BUSCAR ARCHIVOS DE TODOS LOS NODOS
+    # =================================================
 
-        if archivo.endswith(".csv"):
+    for nodo in NODOS:
 
-            archivos_csv.append(
-                archivo
-            )
+        carpeta_nodo = (
+            f"{carpeta}/nodo_{nodo}"
+        )
+
+        if not os.path.exists(
+            carpeta_nodo
+        ):
+
+            continue
+
+        archivos = sorted(
+            os.listdir(carpeta_nodo),
+            reverse=True
+        )
+
+        for archivo in archivos:
+
+            if archivo.endswith(".csv"):
+
+                archivos_csv.append({
+
+                    "nodo":
+                        nodo,
+
+                    "archivo":
+                        archivo
+
+                })
 
     return jsonify(
         archivos_csv
@@ -1982,14 +2005,32 @@ def listar_archivos_csv():
 # =====================================================
 
 @app.route(
-    "/descargar/<nombre_archivo>"
+    "/descargar/<int:nodo>/<nombre_archivo>"
 )
 def descargar_csv(
+    nodo,
     nombre_archivo
 ):
 
+    if nodo not in NODOS:
+
+        return jsonify({
+
+            "status":
+                "error",
+
+            "message":
+                "Nodo inválido"
+
+        }), 400
+
+    carpeta = (
+        f"registros_5min/"
+        f"nodo_{nodo}"
+    )
+
     return send_from_directory(
-        "registros_5min",
+        carpeta,
         nombre_archivo,
         as_attachment=True
     )
@@ -2135,8 +2176,17 @@ def recibir_medicion():
 
 if __name__ == "__main__":
 
+    # =================================================
+    # CREAR CARPETAS DE CSV
+    # =================================================
+
     os.makedirs(
-        "registros_5min",
+        "registros_5min/nodo_1",
+        exist_ok=True
+    )
+
+    os.makedirs(
+        "registros_5min/nodo_2",
         exist_ok=True
     )
 
@@ -2208,6 +2258,10 @@ if __name__ == "__main__":
     )
 
     print(
+        " -> CSV: separado por nodo"
+    )
+
+    print(
         " -> CSV: separado por punto y coma (;)"
     )
 
@@ -2216,7 +2270,13 @@ if __name__ == "__main__":
     )
 
     print(
-        " -> CSV: carpeta registros_5min"
+        " -> CSV Nodo 1: "
+        "registros_5min/nodo_1"
+    )
+
+    print(
+        " -> CSV Nodo 2: "
+        "registros_5min/nodo_2"
     )
 
     print(
