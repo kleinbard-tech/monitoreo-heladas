@@ -31,94 +31,105 @@ const datosNodos = {
 // INICIALIZACIÓN DE CHART.JS
 // =====================================================
 
-const ctx = document.getElementById(
-    "graficaTemperatura"
-);
+const ctx =
+    document.getElementById(
+        "graficaTemperatura"
+    );
 
-const graficaTemperatura = new Chart(
-    ctx,
-    {
-        type: "line",
+const graficaTemperatura =
+    new Chart(
+        ctx,
+        {
+            type: "line",
 
-        data: {
+            data: {
 
-            labels: [],
+                labels: [],
 
-            datasets: [
+                datasets: [
 
-                {
-                    label: "Temperatura DS18B20",
+                    {
+                        label:
+                            "Temperatura DS18B20",
 
-                    data: [],
+                        data: [],
 
-                    borderColor: "#2563eb",
+                        borderColor:
+                            "#2563eb",
 
-                    backgroundColor:
-                        "rgba(37, 99, 235, 0.1)",
+                        backgroundColor:
+                            "rgba(37, 99, 235, 0.1)",
 
-                    tension: 0.3,
+                        tension: 0.3,
 
-                    fill: true,
+                        fill: true,
 
-                    pointRadius: 4,
+                        pointRadius: 4,
 
-                    pointHoverRadius: 6
-                },
+                        pointHoverRadius: 6
+                    },
 
-                {
-                    label: "Punto de rocío",
+                    {
+                        label:
+                            "Punto de rocío",
 
-                    data: [],
+                        data: [],
 
-                    borderColor: "#0891b2",
+                        borderColor:
+                            "#0891b2",
 
-                    borderDash: [5, 5],
+                        borderDash:
+                            [5, 5],
 
-                    tension: 0.3,
+                        tension: 0.3,
 
-                    pointRadius: 4,
+                        pointRadius: 4,
 
-                    pointHoverRadius: 6
-                }
-
-            ]
-        },
-
-        options: {
-
-            responsive: true,
-
-            maintainAspectRatio: false,
-
-            interaction: {
-
-                mode: "index",
-
-                intersect: false
-
-            },
-
-            scales: {
-
-                y: {
-
-                    title: {
-
-                        display: true,
-
-                        text: "Temperatura (°C)"
-
+                        pointHoverRadius: 6
                     }
 
+                ]
+            },
+
+            options: {
+
+                responsive: true,
+
+                maintainAspectRatio: false,
+
+                interaction: {
+
+                    mode: "index",
+
+                    intersect: false
+
                 },
 
-                x: {
+                scales: {
 
-                    title: {
+                    y: {
 
-                        display: true,
+                        title: {
 
-                        text: "Hora"
+                            display: true,
+
+                            text:
+                                "Temperatura (°C)"
+
+                        }
+
+                    },
+
+                    x: {
+
+                        title: {
+
+                            display: true,
+
+                            text:
+                                "Hora"
+
+                        }
 
                     }
 
@@ -127,9 +138,7 @@ const graficaTemperatura = new Chart(
             }
 
         }
-
-    }
-);
+    );
 
 
 // =====================================================
@@ -140,9 +149,11 @@ async function actualizarHistorial() {
 
     try {
 
-        const respuesta = await fetch(
-            URL_HISTORIAL
-        );
+        const respuesta =
+            await fetch(
+                URL_HISTORIAL
+            );
+
 
         if (!respuesta.ok) {
 
@@ -151,6 +162,7 @@ async function actualizarHistorial() {
             );
 
         }
+
 
         const historial =
             await respuesta.json();
@@ -183,7 +195,7 @@ async function actualizarHistorial() {
 
 
         // =================================================
-        // SEPARAR LOS DATOS SEGÚN EL NODO
+        // SEPARAR LOS DATOS POR NODO
         // =================================================
 
         historial.forEach(
@@ -220,7 +232,9 @@ async function actualizarHistorial() {
 
                 datosNodos[nodo]
                     .horarios
-                    .push(hora);
+                    .push(
+                        hora
+                    );
 
 
                 datosNodos[nodo]
@@ -240,12 +254,7 @@ async function actualizarHistorial() {
         );
 
 
-        // =================================================
-        // ACTUALIZAR GRÁFICA
-        // =================================================
-
         actualizarGrafica();
-
 
     }
 
@@ -330,34 +339,28 @@ function actualizarGrafica() {
     }
 
 
-    // =================================================
-    // DATOS DE LA GRÁFICA
-    // =================================================
-
     graficaTemperatura.data.labels =
         datos.horarios;
 
 
-    graficaTemperatura.data.datasets[0].data =
+    graficaTemperatura
+        .data
+        .datasets[0]
+        .data =
         datos.temperatura;
 
 
-    graficaTemperatura.data.datasets[1].data =
+    graficaTemperatura
+        .data
+        .datasets[1]
+        .data =
         datos.puntoRocio;
 
-
-    // =================================================
-    // ACTUALIZAR CHART.JS
-    // =================================================
 
     graficaTemperatura.resize();
 
     graficaTemperatura.update();
 
-
-    // =================================================
-    // IR AL FINAL DEL GRÁFICO
-    // =================================================
 
     if (areaGrafica) {
 
@@ -396,10 +399,6 @@ async function actualizarDatos() {
             await respuesta.json();
 
 
-        // =================================================
-        // ACTUALIZAR NODO 1 Y NODO 2
-        // =================================================
-
         [1, 2].forEach(
             num => {
 
@@ -426,14 +425,9 @@ async function actualizarDatos() {
         );
 
 
-        // =================================================
-        // ACTUALIZAR ESTADO GENERAL
-        // =================================================
-
         actualizarEstado(
             datos
         );
-
 
     }
 
@@ -471,10 +465,6 @@ function actualizarNodo(
     }
 
 
-    // =================================================
-    // SI ESTÁ DESCONECTADO
-    // =================================================
-
     if (
         dato.conectado === false
     ) {
@@ -488,20 +478,22 @@ function actualizarNodo(
     }
 
 
-    // =================================================
-    // MARCAR COMO CONECTADO
-    // =================================================
-
     elConexion.className =
         "conexion conectado";
 
 
-    elConexion
-        .querySelector(
+    const textoConexion =
+        elConexion.querySelector(
             ".texto-conexion"
-        )
-        .textContent =
-        "Conectado";
+        );
+
+
+    if (textoConexion) {
+
+        textoConexion.textContent =
+            "Conectado";
+
+    }
 
 
     // =================================================
@@ -516,7 +508,8 @@ function actualizarNodo(
 
     if (
         elementoDS &&
-        dato.temperaturaDS !== undefined
+        dato.temperaturaDS !== undefined &&
+        dato.temperaturaDS !== null
     ) {
 
         elementoDS.textContent =
@@ -540,7 +533,8 @@ function actualizarNodo(
 
     if (
         elementoDHT &&
-        dato.temperaturaDHT !== undefined
+        dato.temperaturaDHT !== undefined &&
+        dato.temperaturaDHT !== null
     ) {
 
         elementoDHT.textContent =
@@ -564,7 +558,8 @@ function actualizarNodo(
 
     if (
         elementoHumedad &&
-        dato.humedad !== undefined
+        dato.humedad !== undefined &&
+        dato.humedad !== null
     ) {
 
         elementoHumedad.textContent =
@@ -686,10 +681,6 @@ function actualizarEstado(
         0;
 
 
-    // =================================================
-    // RECORRER NODOS
-    // =================================================
-
     for (
         const numNodo in datos
     ) {
@@ -705,10 +696,6 @@ function actualizarEstado(
 
             cantidadNodosConectados++;
 
-
-            // =============================================
-            // EVALUAR ALERTA
-            // =============================================
 
             if (
                 infoNodo.estado &&
@@ -795,7 +782,7 @@ function actualizarEstado(
 
 
     // =================================================
-    // HAY AL MENOS UN NODO CONECTADO
+    // HAY NODOS CONECTADOS
     // =================================================
 
     elementoEstado.textContent =
@@ -935,10 +922,6 @@ function inicializarMapa() {
     );
 
 
-    // =================================================
-    // MARCADOR NODO 1
-    // =================================================
-
     const marcadorNodo1 =
         L.marker(
             coordenadasNodo1
@@ -951,10 +934,6 @@ function inicializarMapa() {
         );
 
 
-    // =================================================
-    // MARCADOR NODO 2
-    // =================================================
-
     const marcadorNodo2 =
         L.marker(
             coordenadasNodo2
@@ -966,10 +945,6 @@ function inicializarMapa() {
             "<b>Nodo 2 (Ciruela 1)</b><br>Chacra Experimental FACA"
         );
 
-
-    // =================================================
-    // AJUSTAR MAPA A LOS DOS NODOS
-    // =================================================
 
     const grupoNodos =
         L.featureGroup(
@@ -1088,7 +1063,7 @@ if (
 
 
                 // =================================================
-                // COMPROBAR RESPUESTA DEL SERVIDOR
+                // COMPROBAR RESPUESTA
                 // =================================================
 
                 if (
@@ -1106,8 +1081,51 @@ if (
                 // CONVERTIR RESPUESTA A JSON
                 // =================================================
 
-                const archivos =
+                const datos =
                     await respuesta.json();
+
+
+                console.log(
+                    "Respuesta de /api/archivos-csv:",
+                    datos
+                );
+
+
+                // =================================================
+                // OBTENER LISTA DE ARCHIVOS
+                // =================================================
+
+                let archivos =
+                    datos;
+
+
+                /*
+                 * El servidor puede devolver directamente:
+                 *
+                 * [
+                 *     "historial_nodo1_2026-09.csv",
+                 *     "historial_nodo2_2026-09.csv"
+                 * ]
+                 *
+                 * o:
+                 *
+                 * {
+                 *     "archivos": [...]
+                 * }
+                 */
+
+                if (
+                    !Array.isArray(archivos) &&
+                    datos &&
+                    Array.isArray(
+                        datos.archivos
+                    )
+                ) {
+
+                    archivos =
+                        datos.archivos;
+
+                }
 
 
                 // =================================================
@@ -1184,6 +1202,72 @@ if (
                 archivos.forEach(
                     function(archivo) {
 
+                        // =========================================
+                        // OBTENER NOMBRE DEL ARCHIVO
+                        // =========================================
+
+                        let nombreArchivo =
+                            "";
+
+
+                        // =========================================
+                        // SI YA ES UN TEXTO
+                        // =========================================
+
+                        if (
+                            typeof archivo ===
+                            "string"
+                        ) {
+
+                            nombreArchivo =
+                                archivo;
+
+                        }
+
+
+                        // =========================================
+                        // SI ES UN OBJETO
+                        // =========================================
+
+                        else if (
+                            archivo &&
+                            typeof archivo ===
+                            "object"
+                        ) {
+
+                            nombreArchivo =
+                                archivo.nombre ||
+                                archivo.archivo ||
+                                archivo.filename ||
+                                archivo.name ||
+                                archivo.file ||
+                                "";
+
+                        }
+
+
+                        // =========================================
+                        // COMPROBAR NOMBRE
+                        // =========================================
+
+                        if (
+                            !nombreArchivo
+                        ) {
+
+                            console.warn(
+                                "No se pudo obtener el nombre del archivo:",
+                                archivo
+                            );
+
+                            return;
+
+                        }
+
+
+                        // =========================================
+                        // VARIABLES
+                        // =========================================
+
                         let nodo =
                             "";
 
@@ -1195,11 +1279,11 @@ if (
 
 
                         // =========================================
-                        // ARCHIVO DEL NODO 1
+                        // NODO 1
                         // =========================================
 
                         if (
-                            archivo.startsWith(
+                            nombreArchivo.startsWith(
                                 "historial_nodo1_"
                             )
                         ) {
@@ -1209,7 +1293,7 @@ if (
 
 
                             const parteFecha =
-                                archivo
+                                nombreArchivo
                                     .replace(
                                         "historial_nodo1_",
                                         ""
@@ -1237,11 +1321,11 @@ if (
 
 
                         // =========================================
-                        // ARCHIVO DEL NODO 2
+                        // NODO 2
                         // =========================================
 
                         else if (
-                            archivo.startsWith(
+                            nombreArchivo.startsWith(
                                 "historial_nodo2_"
                             )
                         ) {
@@ -1251,7 +1335,7 @@ if (
 
 
                             const parteFecha =
-                                archivo
+                                nombreArchivo
                                     .replace(
                                         "historial_nodo2_",
                                         ""
@@ -1283,26 +1367,17 @@ if (
                         // =========================================
 
                         else if (
-                            archivo.startsWith(
+                            nombreArchivo.startsWith(
                                 "historial_"
                             )
                         ) {
-
-                            /*
-                             * Esto permite que los archivos
-                             * antiguos sigan apareciendo.
-                             *
-                             * Ejemplo:
-                             *
-                             * historial_2026-09.csv
-                             */
 
                             nodo =
                                 "Historial";
 
 
                             const parteFecha =
-                                archivo
+                                nombreArchivo
                                     .replace(
                                         "historial_",
                                         ""
@@ -1337,9 +1412,8 @@ if (
 
                             console.warn(
                                 "Archivo CSV con formato desconocido:",
-                                archivo
+                                nombreArchivo
                             );
-
 
                             return;
 
@@ -1347,7 +1421,7 @@ if (
 
 
                         // =========================================
-                        // OBTENER NOMBRE DEL MES
+                        // NOMBRE DEL MES
                         // =========================================
 
                         const nombreMes =
@@ -1372,7 +1446,7 @@ if (
                         li.innerHTML = `
 
                             <a
-                                href="/descargar/${encodeURIComponent(archivo)}"
+                                href="/descargar/${encodeURIComponent(nombreArchivo)}"
                                 target="_blank"
                                 style="
                                     display: inline-block;
@@ -1411,10 +1485,6 @@ if (
             }
 
             catch (error) {
-
-                // =================================================
-                // MOSTRAR ERROR REAL EN CONSOLA
-                // =================================================
 
                 console.error(
                     "Error cargando la lista de CSV:",
