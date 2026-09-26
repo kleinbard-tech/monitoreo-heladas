@@ -1,17 +1,16 @@
-// =====================================================
-// CONFIGURACIÓN DE ENDPOINTS
-// =====================================================
+// ============================================================
+// CONFIGURACIÓN
+// ============================================================
 
 const URL_DATOS = "/datos";
 const URL_HISTORIAL = "/historial";
 
 
-// =====================================================
-// DATOS DE NODO PARA GRÁFICAS
-// =====================================================
+// ============================================================
+// DATOS DE LOS NODOS
+// ============================================================
 
 const datosNodos = {
-
     nodo1: {
         horarios: [],
         temperatura: [],
@@ -23,232 +22,226 @@ const datosNodos = {
         temperatura: [],
         puntoRocio: []
     }
-
 };
 
 
-// =====================================================
-// INICIALIZACIÓN DE CHART.JS
-// =====================================================
+// ============================================================
+// GRÁFICO
+// ============================================================
 
-const ctx =
-    document.getElementById(
-        "graficaTemperatura"
+let graficoTemperatura = null;
+
+
+// ============================================================
+// INICIO
+// ============================================================
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+        inicializarGrafico();
+
+        actualizarDatos();
+        actualizarHistorial();
+        cargarListaCSV();
+
+        setInterval(
+            actualizarDatos,
+            2000
+        );
+
+        setInterval(
+            actualizarHistorial,
+            5000
+        );
+
+    }
+);
+
+
+// ============================================================
+// INICIALIZAR GRÁFICO
+// ============================================================
+
+function inicializarGrafico() {
+
+    const canvas = document.getElementById(
+        "graficoTemperatura"
     );
 
-const graficaTemperatura =
-    new Chart(
+    if (!canvas) {
+        console.warn(
+            "No se encontró el canvas graficoTemperatura"
+        );
+
+        return;
+    }
+
+    const ctx = canvas.getContext("2d");
+
+    graficoTemperatura = new Chart(
         ctx,
         {
             type: "line",
 
             data: {
-
                 labels: [],
 
                 datasets: [
-
                     {
-                        label:
-                            "Temperatura DS18B20",
-
+                        label: "Nodo 1 - Temperatura",
                         data: [],
-
-                        borderColor:
-                            "#2563eb",
-
-                        backgroundColor:
-                            "rgba(37, 99, 235, 0.1)",
-
-                        tension: 0.3,
-
-                        fill: true,
-
-                        pointRadius: 4,
-
-                        pointHoverRadius: 6
+                        tension: 0.2,
+                        borderWidth: 2,
+                        pointRadius: 2
                     },
 
                     {
-                        label:
-                            "Punto de rocío",
-
+                        label: "Nodo 1 - Punto de rocío",
                         data: [],
+                        tension: 0.2,
+                        borderWidth: 2,
+                        pointRadius: 2
+                    },
 
-                        borderColor:
-                            "#0891b2",
+                    {
+                        label: "Nodo 2 - Temperatura",
+                        data: [],
+                        tension: 0.2,
+                        borderWidth: 2,
+                        pointRadius: 2
+                    },
 
-                        borderDash:
-                            [5, 5],
-
-                        tension: 0.3,
-
-                        pointRadius: 4,
-
-                        pointHoverRadius: 6
+                    {
+                        label: "Nodo 2 - Punto de rocío",
+                        data: [],
+                        tension: 0.2,
+                        borderWidth: 2,
+                        pointRadius: 2
                     }
-
                 ]
             },
 
             options: {
-
                 responsive: true,
 
                 maintainAspectRatio: false,
 
                 interaction: {
-
                     mode: "index",
-
                     intersect: false
-
                 },
 
                 scales: {
-
-                    y: {
-
+                    x: {
                         title: {
-
                             display: true,
-
-                            text:
-                                "Temperatura (°C)"
-
+                            text: "Hora"
                         }
-
                     },
 
-                    x: {
-
+                    y: {
                         title: {
-
                             display: true,
-
-                            text:
-                                "Hora"
-
+                            text: "Temperatura (°C)"
                         }
-
                     }
-
                 }
-
             }
-
         }
     );
+}
 
 
-// =====================================================
+// ============================================================
 // ACTUALIZAR HISTORIAL
-// =====================================================
+// ============================================================
 
 async function actualizarHistorial() {
 
     try {
 
-        const respuesta =
-            await fetch(
-                URL_HISTORIAL
-            );
-
+        const respuesta = await fetch(
+            URL_HISTORIAL
+        );
 
         if (!respuesta.ok) {
 
             throw new Error(
-                `Error HTTP ${respuesta.status}`
+                "Error HTTP " + respuesta.status
             );
 
         }
 
-
-        const historial =
-            await respuesta.json();
+        const historial = await respuesta.json();
 
 
-        // =================================================
-        // LIMPIAR DATOS DE LOS DOS NODOS
-        // =================================================
+        // ----------------------------------------------------
+        // Limpiar datos anteriores
+        // ----------------------------------------------------
 
-        datosNodos.nodo1 = {
+        datosNodos.nodo1.horarios = [];
+        datosNodos.nodo1.temperatura = [];
+        datosNodos.nodo1.puntoRocio = [];
 
-            horarios: [],
-
-            temperatura: [],
-
-            puntoRocio: []
-
-        };
+        datosNodos.nodo2.horarios = [];
+        datosNodos.nodo2.temperatura = [];
+        datosNodos.nodo2.puntoRocio = [];
 
 
-        datosNodos.nodo2 = {
-
-            horarios: [],
-
-            temperatura: [],
-
-            puntoRocio: []
-
-        };
-
-
-        // =================================================
-        // SEPARAR LOS DATOS POR NODO
-        // =================================================
+        // ----------------------------------------------------
+        // Procesar historial
+        // ----------------------------------------------------
 
         historial.forEach(
-            dato => {
-
-                const nodo =
-                    "nodo" + dato.nodo;
-
+            function (dato) {
 
                 if (
-                    !datosNodos[nodo]
+                    dato.nodo !== 1 &&
+                    dato.nodo !== 2
                 ) {
-
                     return;
-
                 }
 
 
-                if (
-                    !dato.fechaHora
-                ) {
+                const nodo = "nodo" + dato.nodo;
 
+
+                let fechaHora = dato.fecha_hora;
+
+
+                if (!fechaHora) {
                     return;
-
                 }
 
 
-                const hora =
-                    dato.fechaHora.substring(
+                let hora = fechaHora;
+
+
+                if (fechaHora.length >= 16) {
+
+                    hora = fechaHora.substring(
                         11,
                         16
                     );
 
-
-                datosNodos[nodo]
-                    .horarios
-                    .push(
-                        hora
-                    );
+                }
 
 
-                datosNodos[nodo]
-                    .temperatura
-                    .push(
-                        dato.temperaturaDS
-                    );
+                datosNodos[nodo].horarios.push(
+                    hora
+                );
 
 
-                datosNodos[nodo]
-                    .puntoRocio
-                    .push(
-                        dato.puntoRocio
-                    );
+                datosNodos[nodo].temperatura.push(
+                    dato.temperaturaDS
+                );
+
+
+                datosNodos[nodo].puntoRocio.push(
+                    dato.puntoRocio
+                );
 
             }
         );
@@ -257,139 +250,499 @@ async function actualizarHistorial() {
         actualizarGrafica();
 
     }
-
     catch (error) {
 
         console.error(
-            "Error obteniendo historial:",
+            "Error cargando historial:",
             error
         );
 
     }
-
 }
 
 
-// =====================================================
+// ============================================================
 // ACTUALIZAR GRÁFICA
-// =====================================================
+// ============================================================
 
 function actualizarGrafica() {
 
-    const selector =
-        document.getElementById(
-            "seleccionNodo"
-        );
-
-
-    if (!selector) {
-
+    if (!graficoTemperatura) {
         return;
-
     }
 
 
-    const nodoSeleccionado =
-        selector.value;
+    const nodo1 = datosNodos.nodo1;
+    const nodo2 = datosNodos.nodo2;
 
 
-    const datos =
-        datosNodos[nodoSeleccionado];
+    // --------------------------------------------------------
+    // Crear conjunto de horarios
+    // --------------------------------------------------------
+
+    const horarios = [];
 
 
-    if (!datos) {
+    nodo1.horarios.forEach(
+        function (hora) {
 
-        return;
+            if (!horarios.includes(hora)) {
+                horarios.push(hora);
+            }
 
-    }
-
-
-    const contenedorScroll =
-        document.querySelector(
-            ".contenedor-grafico-scroll"
-        );
+        }
+    );
 
 
-    const areaGrafica =
-        document.querySelector(
-            ".area-grafica"
-        );
+    nodo2.horarios.forEach(
+        function (hora) {
+
+            if (!horarios.includes(hora)) {
+                horarios.push(hora);
+            }
+
+        }
+    );
 
 
-    if (
-        contenedorScroll &&
-        areaGrafica &&
-        datos.horarios.length > 0
+    horarios.sort();
+
+
+    // --------------------------------------------------------
+    // Función para buscar un valor según horario
+    // --------------------------------------------------------
+
+    function obtenerValor(
+        horariosNodo,
+        valoresNodo,
+        hora
     ) {
 
-        const anchoMinimoContainer =
-            areaGrafica.clientWidth;
+        const indice = horariosNodo.indexOf(
+            hora
+        );
 
 
-        const anchoCalculado =
-            Math.max(
-                anchoMinimoContainer,
-                datos.horarios.length * 35
+        if (indice === -1) {
+            return null;
+        }
+
+
+        return valoresNodo[indice];
+
+    }
+
+
+    // --------------------------------------------------------
+    // Datos para los cuatro conjuntos
+    // --------------------------------------------------------
+
+    const temperaturaNodo1 = [];
+    const puntoRocioNodo1 = [];
+
+    const temperaturaNodo2 = [];
+    const puntoRocioNodo2 = [];
+
+
+    horarios.forEach(
+        function (hora) {
+
+            temperaturaNodo1.push(
+                obtenerValor(
+                    nodo1.horarios,
+                    nodo1.temperatura,
+                    hora
+                )
             );
 
 
-        contenedorScroll.style.width =
-            `${anchoCalculado}px`;
-
-    }
-
-
-    graficaTemperatura.data.labels =
-        datos.horarios;
-
-
-    graficaTemperatura
-        .data
-        .datasets[0]
-        .data =
-        datos.temperatura;
+            puntoRocioNodo1.push(
+                obtenerValor(
+                    nodo1.horarios,
+                    nodo1.puntoRocio,
+                    hora
+                )
+            );
 
 
-    graficaTemperatura
-        .data
-        .datasets[1]
-        .data =
-        datos.puntoRocio;
+            temperaturaNodo2.push(
+                obtenerValor(
+                    nodo2.horarios,
+                    nodo2.temperatura,
+                    hora
+                )
+            );
 
 
-    graficaTemperatura.resize();
+            puntoRocioNodo2.push(
+                obtenerValor(
+                    nodo2.horarios,
+                    nodo2.puntoRocio,
+                    hora
+                )
+            );
 
-    graficaTemperatura.update();
+        }
+    );
 
 
-    if (areaGrafica) {
+    // --------------------------------------------------------
+    // Actualizar gráfico
+    // --------------------------------------------------------
 
-        areaGrafica.scrollLeft =
-            areaGrafica.scrollWidth;
+    graficoTemperatura.data.labels = horarios;
 
-    }
+
+    graficoTemperatura.data.datasets[0].data =
+        temperaturaNodo1;
+
+    graficoTemperatura.data.datasets[1].data =
+        puntoRocioNodo1;
+
+    graficoTemperatura.data.datasets[2].data =
+        temperaturaNodo2;
+
+    graficoTemperatura.data.datasets[3].data =
+        puntoRocioNodo2;
+
+
+    graficoTemperatura.update();
 
 }
 
 
-// =====================================================
-// ACTUALIZAR DATOS EN TIEMPO REAL
-// =====================================================
+// ============================================================
+// ACTUALIZAR DATOS ACTUALES
+// ============================================================
 
 async function actualizarDatos() {
 
     try {
 
-        const respuesta =
-            await fetch(
-                URL_DATOS
-            );
+        const respuesta = await fetch(
+            URL_DATOS
+        );
 
 
         if (!respuesta.ok) {
 
             throw new Error(
-                `Error HTTP ${respuesta.status}`
+                "Error HTTP " + respuesta.status
+            );
+
+        }
+
+
+        const datos = await respuesta.json();
+
+
+        // ----------------------------------------------------
+        // Nodo 1
+        // ----------------------------------------------------
+
+        if (datos["1"]) {
+
+            actualizarNodo(
+                1,
+                datos["1"]
+            );
+
+        }
+        else {
+
+            marcarDesconectado(
+                1
+            );
+
+        }
+
+
+        // ----------------------------------------------------
+        // Nodo 2
+        // ----------------------------------------------------
+
+        if (datos["2"]) {
+
+            actualizarNodo(
+                2,
+                datos["2"]
+            );
+
+        }
+        else {
+
+            marcarDesconectado(
+                2
+            );
+
+        }
+
+
+        actualizarEstado();
+
+    }
+    catch (error) {
+
+        console.error(
+            "Error actualizando datos:",
+            error
+        );
+
+    }
+}
+
+
+// ============================================================
+// ACTUALIZAR INFORMACIÓN DE UN NODO
+// ============================================================
+
+function actualizarNodo(
+    numeroNodo,
+    datos
+) {
+
+    const prefijo =
+        "nodo" + numeroNodo;
+
+
+    // --------------------------------------------------------
+    // Estado
+    // --------------------------------------------------------
+
+    const estado = document.getElementById(
+        prefijo + "-estado"
+    );
+
+    if (estado) {
+
+        estado.textContent =
+            "Conectado";
+
+    }
+
+
+    // --------------------------------------------------------
+    // Temperatura DS18B20
+    // --------------------------------------------------------
+
+    const temperaturaDS =
+        document.getElementById(
+            prefijo + "-temperatura"
+        );
+
+
+    if (temperaturaDS) {
+
+        temperaturaDS.textContent =
+            datos.temperaturaDS + " °C";
+
+    }
+
+
+    // --------------------------------------------------------
+    // Temperatura DHT22
+    // --------------------------------------------------------
+
+    const temperaturaDHT =
+        document.getElementById(
+            prefijo + "-temperatura-dht"
+        );
+
+
+    if (temperaturaDHT) {
+
+        temperaturaDHT.textContent =
+            datos.temperaturaDHT + " °C";
+
+    }
+
+
+    // --------------------------------------------------------
+    // Humedad
+    // --------------------------------------------------------
+
+    const humedad =
+        document.getElementById(
+            prefijo + "-humedad"
+        );
+
+
+    if (humedad) {
+
+        humedad.textContent =
+            datos.humedad + " %";
+
+    }
+
+
+    // --------------------------------------------------------
+    // Punto de rocío
+    // --------------------------------------------------------
+
+    const puntoRocio =
+        document.getElementById(
+            prefijo + "-punto-rocio"
+        );
+
+
+    if (puntoRocio) {
+
+        puntoRocio.textContent =
+            datos.puntoRocio + " °C";
+
+    }
+
+
+    // --------------------------------------------------------
+    // Última actualización
+    // --------------------------------------------------------
+
+    const actualizacion =
+        document.getElementById(
+            prefijo + "-actualizacion"
+        );
+
+
+    if (actualizacion) {
+
+        if (datos.fecha_hora) {
+
+            actualizacion.textContent =
+                datos.fecha_hora;
+
+        }
+        else if (datos.ultima_actualizacion) {
+
+            actualizacion.textContent =
+                datos.ultima_actualizacion;
+
+        }
+
+    }
+
+}
+
+
+// ============================================================
+// MARCAR NODO COMO DESCONECTADO
+// ============================================================
+
+function marcarDesconectado(
+    numeroNodo
+) {
+
+    const prefijo =
+        "nodo" + numeroNodo;
+
+
+    const estado =
+        document.getElementById(
+            prefijo + "-estado"
+        );
+
+
+    if (estado) {
+
+        estado.textContent =
+            "Desconectado";
+
+    }
+
+}
+
+
+// ============================================================
+// ACTUALIZAR ESTADO GENERAL
+// ============================================================
+
+function actualizarEstado() {
+
+    const estados = [];
+
+
+    for (
+        let numeroNodo = 1;
+        numeroNodo <= 2;
+        numeroNodo++
+    ) {
+
+        const elemento =
+            document.getElementById(
+                "nodo" +
+                numeroNodo +
+                "-estado"
+            );
+
+
+        if (elemento) {
+
+            estados.push(
+                elemento.textContent
+            );
+
+        }
+
+    }
+
+
+    const conectados =
+        estados.filter(
+            function (estado) {
+                return estado === "Conectado";
+            }
+        ).length;
+
+
+    const elementoGeneral =
+        document.getElementById(
+            "estado-general"
+        );
+
+
+    if (elementoGeneral) {
+
+        if (conectados === 2) {
+
+            elementoGeneral.textContent =
+                "Todos los nodos conectados";
+
+        }
+        else if (conectados === 1) {
+
+            elementoGeneral.textContent =
+                "1 nodo conectado";
+
+        }
+        else {
+
+            elementoGeneral.textContent =
+                "Ningún nodo conectado";
+
+        }
+
+    }
+
+}
+
+
+// ============================================================
+// LISTA DE ARCHIVOS CSV
+// ============================================================
+
+async function cargarListaCSV() {
+
+    try {
+
+        const respuesta = await fetch(
+            "/api/archivos-csv"
+        );
+
+
+        if (!respuesta.ok) {
+
+            throw new Error(
+                "Error HTTP " +
+                respuesta.status
             );
 
         }
@@ -399,1117 +752,407 @@ async function actualizarDatos() {
             await respuesta.json();
 
 
-        [1, 2].forEach(
-            num => {
-
-                if (
-                    datos[num]
-                ) {
-
-                    actualizarNodo(
-                        num,
-                        datos[num]
-                    );
-
-                }
-
-                else {
-
-                    marcarDesconectado(
-                        num
-                    );
-
-                }
-
-            }
-        );
-
-
-        actualizarEstado(
+        console.log(
+            "Respuesta de /api/archivos-csv:",
             datos
         );
 
-    }
 
-    catch (error) {
+        // ----------------------------------------------------
+        // Buscar el contenedor
+        // ----------------------------------------------------
 
-        console.error(
-            "Error obteniendo datos:",
-            error
-        );
+        const contenedor =
+            document.getElementById(
+                "lista-csv"
+            );
 
-    }
 
-}
+        if (!contenedor) {
 
+            console.warn(
+                "No se encontró el elemento #lista-csv"
+            );
 
-// =====================================================
-// ACTUALIZAR INFORMACIÓN DE UN NODO
-// =====================================================
-
-function actualizarNodo(
-    numeroNodo,
-    dato
-) {
-
-    const elConexion =
-        document.getElementById(
-            `nodo${numeroNodo}-conexion`
-        );
-
-
-    if (!elConexion) {
-
-        return;
-
-    }
-
-
-    if (
-        dato.conectado === false
-    ) {
-
-        marcarDesconectado(
-            numeroNodo
-        );
-
-        return;
-
-    }
-
-
-    elConexion.className =
-        "conexion conectado";
-
-
-    const textoConexion =
-        elConexion.querySelector(
-            ".texto-conexion"
-        );
-
-
-    if (textoConexion) {
-
-        textoConexion.textContent =
-            "Conectado";
-
-    }
-
-
-    // =================================================
-    // TEMPERATURA DS18B20
-    // =================================================
-
-    const elementoDS =
-        document.getElementById(
-            `nodo${numeroNodo}-temperaturaDS`
-        );
-
-
-    if (
-        elementoDS &&
-        dato.temperaturaDS !== undefined &&
-        dato.temperaturaDS !== null
-    ) {
-
-        elementoDS.textContent =
-            Number(
-                dato.temperaturaDS
-            ).toFixed(2)
-            + " °C";
-
-    }
-
-
-    // =================================================
-    // TEMPERATURA DHT22
-    // =================================================
-
-    const elementoDHT =
-        document.getElementById(
-            `nodo${numeroNodo}-temperaturaDHT`
-        );
-
-
-    if (
-        elementoDHT &&
-        dato.temperaturaDHT !== undefined &&
-        dato.temperaturaDHT !== null
-    ) {
-
-        elementoDHT.textContent =
-            Number(
-                dato.temperaturaDHT
-            ).toFixed(2)
-            + " °C";
-
-    }
-
-
-    // =================================================
-    // HUMEDAD
-    // =================================================
-
-    const elementoHumedad =
-        document.getElementById(
-            `nodo${numeroNodo}-humedad`
-        );
-
-
-    if (
-        elementoHumedad &&
-        dato.humedad !== undefined &&
-        dato.humedad !== null
-    ) {
-
-        elementoHumedad.textContent =
-            Number(
-                dato.humedad
-            ).toFixed(2)
-            + " %";
-
-    }
-
-
-    // =================================================
-    // PUNTO DE ROCÍO
-    // =================================================
-
-    const elementoRocio =
-        document.getElementById(
-            `nodo${numeroNodo}-puntoRocio`
-        );
-
-
-    if (
-        elementoRocio &&
-        dato.puntoRocio !== undefined &&
-        dato.puntoRocio !== null
-    ) {
-
-        elementoRocio.textContent =
-            Number(
-                dato.puntoRocio
-            ).toFixed(2)
-            + " °C";
-
-    }
-
-
-    // =================================================
-    // FECHA DE ACTUALIZACIÓN
-    // =================================================
-
-    const elementoActualizacion =
-        document.getElementById(
-            `nodo${numeroNodo}-actualizacion`
-        );
-
-
-    if (
-        elementoActualizacion &&
-        dato.fechaHora
-    ) {
-
-        elementoActualizacion.textContent =
-            "Última medición: "
-            + dato.fechaHora;
-
-    }
-
-}
-
-
-// =====================================================
-// MARCAR NODO COMO DESCONECTADO
-// =====================================================
-
-function marcarDesconectado(
-    numeroNodo
-) {
-
-    const elConexion =
-        document.getElementById(
-            `nodo${numeroNodo}-conexion`
-        );
-
-
-    if (!elConexion) {
-
-        return;
-
-    }
-
-
-    elConexion.className =
-        "conexion desconectado";
-
-
-    const textoConexion =
-        elConexion.querySelector(
-            ".texto-conexion"
-        );
-
-
-    if (textoConexion) {
-
-        textoConexion.textContent =
-            "Desconectado";
-
-    }
-
-}
-
-
-// =====================================================
-// ACTUALIZAR ESTADO INTELIGENTE
-// =====================================================
-
-function actualizarEstado(
-    datos
-) {
-
-    let estadoGeneral =
-        "NORMAL";
-
-
-    let nodosEnAlerta =
-        [];
-
-
-    let cantidadNodosConectados =
-        0;
-
-
-    for (
-        const numNodo in datos
-    ) {
-
-        const infoNodo =
-            datos[numNodo];
-
-
-        if (
-            infoNodo &&
-            infoNodo.conectado !== false
-        ) {
-
-            cantidadNodosConectados++;
-
-
-            if (
-                infoNodo.estado &&
-                infoNodo.estado !== "NORMAL"
-            ) {
-
-                estadoGeneral =
-                    infoNodo.estado;
-
-
-                if (
-                    numNodo == 1
-                ) {
-
-                    nodosEnAlerta.push(
-                        "Nodo 1 (Manzana 1)"
-                    );
-
-                }
-
-
-                if (
-                    numNodo == 2
-                ) {
-
-                    nodosEnAlerta.push(
-                        "Nodo 2 (Ciruela 1)"
-                    );
-
-                }
-
-            }
+            return;
 
         }
 
-    }
 
+        // ----------------------------------------------------
+        // Limpiar contenido anterior
+        // ----------------------------------------------------
 
-    const elementoEstado =
-        document.getElementById(
-            "estadoGeneral"
-        );
+        contenedor.innerHTML = "";
 
 
-    const mensajeEstado =
-        document.getElementById(
-            "mensajeEstado"
-        );
+        // ----------------------------------------------------
+        // Recorrer archivos
+        // ----------------------------------------------------
 
+        datos.forEach(
+            function (archivo) {
 
-    if (
-        !elementoEstado ||
-        !mensajeEstado
-    ) {
+                let nombreArchivo = null;
 
-        return;
 
-    }
-
-
-    // =================================================
-    // NINGÚN NODO CONECTADO
-    // =================================================
-
-    if (
-        cantidadNodosConectados === 0
-    ) {
-
-        elementoEstado.textContent =
-            "DESCONECTADO";
-
-
-        mensajeEstado.textContent =
-            "⚠ Sin comunicación con los nodos de la chacra.";
-
-
-        elementoEstado.style.color =
-            "#64748b";
-
-
-        return;
-
-    }
-
-
-    // =================================================
-    // HAY NODOS CONECTADOS
-    // =================================================
-
-    elementoEstado.textContent =
-        estadoGeneral;
-
-
-    if (
-        nodosEnAlerta.length === 0
-    ) {
-
-        mensajeEstado.textContent =
-            "Sin indicios de helada en este momento.";
-
-
-        elementoEstado.style.color =
-            "#16a34a";
-
-    }
-
-    else if (
-        nodosEnAlerta.length === 1
-    ) {
-
-        mensajeEstado.textContent =
-            `⚠ ¡Alerta de helada detectada en ${nodosEnAlerta[0]}!`;
-
-
-        elementoEstado.style.color =
-            "#dc2626";
-
-    }
-
-    else {
-
-        mensajeEstado.textContent =
-            `⚠ ¡ALERTA GENERAL DE HELADA! Afecta a: ${nodosEnAlerta.join(" y ")}.`;
-
-
-        elementoEstado.style.color =
-            "#dc2626";
-
-    }
-
-}
-
-
-// =====================================================
-// INICIALIZACIÓN Y EVENTOS
-// =====================================================
-
-const selectorNodo =
-    document.getElementById(
-        "seleccionNodo"
-    );
-
-
-if (selectorNodo) {
-
-    selectorNodo.addEventListener(
-        "change",
-        actualizarGrafica
-    );
-
-}
-
-
-actualizarDatos();
-
-actualizarHistorial();
-
-
-setInterval(
-    actualizarDatos,
-    2000
-);
-
-
-setInterval(
-    actualizarHistorial,
-    5000
-);
-
-
-// =====================================================
-// LÓGICA DEL MAPA DESPLEGABLE
-// =====================================================
-
-const coordenadasNodo1 = [
-    -38.845769,
-    -68.071461
-];
-
-
-const coordenadasNodo2 = [
-    -38.845947,
-    -68.071986
-];
-
-
-let mapaInicializado =
-    false;
-
-
-let mapa;
-
-
-function inicializarMapa() {
-
-    if (
-        mapaInicializado
-    ) {
-
-        return;
-
-    }
-
-
-    mapa =
-        L.map(
-            "mapa"
-        ).setView(
-            coordenadasNodo1,
-            18
-        );
-
-
-    L.tileLayer(
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        {
-
-            attribution:
-                "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS"
-
-        }
-    ).addTo(
-        mapa
-    );
-
-
-    const marcadorNodo1 =
-        L.marker(
-            coordenadasNodo1
-        )
-        .addTo(
-            mapa
-        )
-        .bindPopup(
-            "<b>Nodo 1 (Manzana 1)</b><br>Chacra Experimental FACA"
-        );
-
-
-    const marcadorNodo2 =
-        L.marker(
-            coordenadasNodo2
-        )
-        .addTo(
-            mapa
-        )
-        .bindPopup(
-            "<b>Nodo 2 (Ciruela 1)</b><br>Chacra Experimental FACA"
-        );
-
-
-    const grupoNodos =
-        L.featureGroup(
-            [
-                marcadorNodo1,
-                marcadorNodo2
-            ]
-        );
-
-
-    mapa.fitBounds(
-        grupoNodos
-            .getBounds()
-            .pad(0.4)
-    );
-
-
-    mapaInicializado =
-        true;
-
-}
-
-
-// =====================================================
-// DESPLEGABLE DEL MAPA
-// =====================================================
-
-const desplegableMapa =
-    document.getElementById(
-        "desplegableMapa"
-    );
-
-
-if (
-    desplegableMapa
-) {
-
-    desplegableMapa.addEventListener(
-        "toggle",
-        function() {
-
-            if (
-                desplegableMapa.open
-            ) {
-
-                inicializarMapa();
-
-
-                setTimeout(
-                    function() {
-
-                        if (mapa) {
-
-                            mapa.invalidateSize();
-
-                        }
-
-                    },
-                    100
-                );
-
-            }
-
-        }
-    );
-
-}
-
-
-// =====================================================
-// LÓGICA DEL DESPLEGABLE DE HISTORIAL CSV MENSUAL
-// =====================================================
-
-const desplegableHistorial =
-    document.getElementById(
-        "desplegableHistorial"
-    );
-
-
-let historialCargado =
-    false;
-
-
-if (
-    desplegableHistorial
-) {
-
-    desplegableHistorial.addEventListener(
-        "toggle",
-        async function() {
-
-            // =================================================
-            // SOLO CARGAR CUANDO SE ABRE
-            // =================================================
-
-            if (
-                !desplegableHistorial.open ||
-                historialCargado
-            ) {
-
-                return;
-
-            }
-
-
-            try {
-
-                // =================================================
-                // PEDIR LISTA DE CSV AL SERVIDOR
-                // =================================================
-
-                const respuesta =
-                    await fetch(
-                        "/api/archivos-csv"
-                    );
-
-
-                // =================================================
-                // COMPROBAR RESPUESTA
-                // =================================================
+                // ------------------------------------------------
+                // Caso 1: el servidor devuelve directamente
+                // el nombre como texto
+                // ------------------------------------------------
 
                 if (
-                    !respuesta.ok
+                    typeof archivo === "string"
                 ) {
 
-                    throw new Error(
-                        `El servidor respondió con HTTP ${respuesta.status}`
-                    );
+                    nombreArchivo =
+                        archivo;
 
                 }
 
 
-                // =================================================
-                // CONVERTIR RESPUESTA A JSON
-                // =================================================
+                // ------------------------------------------------
+                // Caso 2: el servidor devuelve un objeto
+                // ------------------------------------------------
 
-                const datos =
-                    await respuesta.json();
-
-
-                console.log(
-                    "Respuesta de /api/archivos-csv:",
-                    datos
-                );
-
-
-                // =================================================
-                // OBTENER LISTA DE ARCHIVOS
-                // =================================================
-
-                let archivos =
-                    datos;
-
-
-                /*
-                 * El servidor puede devolver directamente:
-                 *
-                 * [
-                 *     "historial_nodo1_2026-09.csv",
-                 *     "historial_nodo2_2026-09.csv"
-                 * ]
-                 *
-                 * o:
-                 *
-                 * {
-                 *     "archivos": [...]
-                 * }
-                 */
-
-                if (
-                    !Array.isArray(archivos) &&
-                    datos &&
-                    Array.isArray(
-                        datos.archivos
-                    )
+                else if (
+                    typeof archivo === "object" &&
+                    archivo !== null
                 ) {
 
-                    archivos =
-                        datos.archivos;
+                    nombreArchivo =
+                        archivo.nombre ||
+                        archivo.archivo ||
+                        archivo.filename ||
+                        archivo.name ||
+                        archivo.file ||
+                        null;
 
                 }
 
 
-                // =================================================
-                // CONTENEDOR DE LA LISTA
-                // =================================================
+                // ------------------------------------------------
+                // Si no encontramos nombre, ignorar
+                // ------------------------------------------------
 
-                const contenedorLista =
-                    document.getElementById(
-                        "listaArchivosCsv"
+                if (!nombreArchivo) {
+
+                    console.warn(
+                        "No se pudo determinar el nombre del archivo:",
+                        archivo
                     );
-
-
-                if (!contenedorLista) {
-
-                    throw new Error(
-                        "No existe el elemento HTML listaArchivosCsv"
-                    );
-
-                }
-
-
-                contenedorLista.innerHTML =
-                    "";
-
-
-                // =================================================
-                // COMPROBAR SI HAY ARCHIVOS
-                // =================================================
-
-                if (
-                    !Array.isArray(archivos) ||
-                    archivos.length === 0
-                ) {
-
-                    contenedorLista.innerHTML =
-                        "<li>No hay registros mensuales guardados todavía.</li>";
-
-
-                    historialCargado =
-                        true;
-
 
                     return;
 
                 }
 
 
-                // =================================================
-                // NOMBRES DE LOS MESES
-                // =================================================
+                // ------------------------------------------------
+                // Determinar nodo
+                // ------------------------------------------------
 
-                const meses = {
+                let numeroNodo = null;
 
-                    "01": "Enero",
-                    "02": "Febrero",
-                    "03": "Marzo",
-                    "04": "Abril",
-                    "05": "Mayo",
-                    "06": "Junio",
-                    "07": "Julio",
-                    "08": "Agosto",
-                    "09": "Septiembre",
-                    "10": "Octubre",
-                    "11": "Noviembre",
-                    "12": "Diciembre"
 
-                };
+                if (
+                    nombreArchivo.includes(
+                        "historial_nodo1_"
+                    )
+                ) {
 
+                    numeroNodo = 1;
 
-                // =================================================
-                // PROCESAR CADA ARCHIVO
-                // =================================================
+                }
+                else if (
+                    nombreArchivo.includes(
+                        "historial_nodo2_"
+                    )
+                ) {
 
-                archivos.forEach(
-                    function(archivo) {
+                    numeroNodo = 2;
 
-                        // =========================================
-                        // OBTENER NOMBRE DEL ARCHIVO
-                        // =========================================
+                }
 
-                        let nombreArchivo =
-                            "";
 
+                // ------------------------------------------------
+                // Determinar año y mes
+                // ------------------------------------------------
 
-                        // =========================================
-                        // SI YA ES UN TEXTO
-                        // =========================================
+                let anio = "";
+                let mes = "";
 
-                        if (
-                            typeof archivo ===
-                            "string"
-                        ) {
 
-                            nombreArchivo =
-                                archivo;
+                const coincidencia =
+                    nombreArchivo.match(
+                        /_(\d{4})-(\d{2})\.csv$/
+                    );
 
-                        }
 
+                if (coincidencia) {
 
-                        // =========================================
-                        // SI ES UN OBJETO
-                        // =========================================
+                    anio =
+                        coincidencia[1];
 
-                        else if (
-                            archivo &&
-                            typeof archivo ===
-                            "object"
-                        ) {
+                    mes =
+                        coincidencia[2];
 
-                            nombreArchivo =
-                                archivo.nombre ||
-                                archivo.archivo ||
-                                archivo.filename ||
-                                archivo.name ||
-                                archivo.file ||
-                                "";
+                }
 
-                        }
 
+                // ------------------------------------------------
+                // Nombre del mes
+                // ------------------------------------------------
 
-                        // =========================================
-                        // COMPROBAR NOMBRE
-                        // =========================================
+                const nombresMeses = [
+                    "",
+                    "Enero",
+                    "Febrero",
+                    "Marzo",
+                    "Abril",
+                    "Mayo",
+                    "Junio",
+                    "Julio",
+                    "Agosto",
+                    "Septiembre",
+                    "Octubre",
+                    "Noviembre",
+                    "Diciembre"
+                ];
 
-                        if (
-                            !nombreArchivo
-                        ) {
 
-                            console.warn(
-                                "No se pudo obtener el nombre del archivo:",
-                                archivo
-                            );
+                let nombreMes = mes;
 
-                            return;
 
-                        }
-
-
-                        // =========================================
-                        // VARIABLES
-                        // =========================================
-
-                        let nodo =
-                            "";
-
-                        let anio =
-                            "";
-
-                        let mesNum =
-                            "";
-
-
-                        // =========================================
-                        // NODO 1
-                        // =========================================
-
-                        if (
-                            nombreArchivo.startsWith(
-                                "historial_nodo1_"
-                            )
-                        ) {
-
-                            nodo =
-                                "Nodo 1";
-
-
-                            const parteFecha =
-                                nombreArchivo
-                                    .replace(
-                                        "historial_nodo1_",
-                                        ""
-                                    )
-                                    .replace(
-                                        ".csv",
-                                        ""
-                                    );
-
-
-                            const partesFecha =
-                                parteFecha.split(
-                                    "-"
-                                );
-
-
-                            anio =
-                                partesFecha[0];
-
-
-                            mesNum =
-                                partesFecha[1];
-
-                        }
-
-
-                        // =========================================
-                        // NODO 2
-                        // =========================================
-
-                        else if (
-                            nombreArchivo.startsWith(
-                                "historial_nodo2_"
-                            )
-                        ) {
-
-                            nodo =
-                                "Nodo 2";
-
-
-                            const parteFecha =
-                                nombreArchivo
-                                    .replace(
-                                        "historial_nodo2_",
-                                        ""
-                                    )
-                                    .replace(
-                                        ".csv",
-                                        ""
-                                    );
-
-
-                            const partesFecha =
-                                parteFecha.split(
-                                    "-"
-                                );
-
-
-                            anio =
-                                partesFecha[0];
-
-
-                            mesNum =
-                                partesFecha[1];
-
-                        }
-
-
-                        // =========================================
-                        // ARCHIVO ANTIGUO
-                        // =========================================
-
-                        else if (
-                            nombreArchivo.startsWith(
-                                "historial_"
-                            )
-                        ) {
-
-                            nodo =
-                                "Historial";
-
-
-                            const parteFecha =
-                                nombreArchivo
-                                    .replace(
-                                        "historial_",
-                                        ""
-                                    )
-                                    .replace(
-                                        ".csv",
-                                        ""
-                                    );
-
-
-                            const partesFecha =
-                                parteFecha.split(
-                                    "-"
-                                );
-
-
-                            anio =
-                                partesFecha[0];
-
-
-                            mesNum =
-                                partesFecha[1];
-
-                        }
-
-
-                        // =========================================
-                        // FORMATO DESCONOCIDO
-                        // =========================================
-
-                        else {
-
-                            console.warn(
-                                "Archivo CSV con formato desconocido:",
-                                nombreArchivo
-                            );
-
-                            return;
-
-                        }
-
-
-                        // =========================================
-                        // NOMBRE DEL MES
-                        // =========================================
-
-                        const nombreMes =
-                            meses[mesNum] ||
-                            mesNum;
-
-
-                        // =========================================
-                        // CREAR ELEMENTO DE LISTA
-                        // =========================================
-
-                        const li =
-                            document.createElement(
-                                "li"
-                            );
-
-
-                        li.style.marginBottom =
-                            "10px";
-
-
-                        li.innerHTML = `
-
-                            <a
-                                href="/descargar/${encodeURIComponent(nombreArchivo)}"
-                                target="_blank"
-                                style="
-                                    display: inline-block;
-                                    background-color: #0284c7;
-                                    color: white;
-                                    padding: 6px 14px;
-                                    border-radius: 6px;
-                                    text-decoration: none;
-                                    font-size: 13px;
-                                    font-weight: 600;
-                                "
-                            >
-                                📥 Descargar ${nodo} -
-                                ${nombreMes} ${anio}
-                            </a>
-
-                        `;
-
-
-                        contenedorLista.appendChild(
-                            li
-                        );
-
-                    }
-                );
-
-
-                // =================================================
-                // MARCAR COMO CARGADO
-                // =================================================
-
-                historialCargado =
-                    true;
-
-
-            }
-
-            catch (error) {
-
-                console.error(
-                    "Error cargando la lista de CSV:",
-                    error
-                );
-
-
-                const contenedorLista =
-                    document.getElementById(
-                        "listaArchivosCsv"
+                const numeroMes =
+                    parseInt(
+                        mes,
+                        10
                     );
 
 
                 if (
-                    contenedorLista
+                    numeroMes >= 1 &&
+                    numeroMes <= 12
                 ) {
 
-                    contenedorLista.innerHTML =
-                        "<li>Error al cargar los registros históricos.</li>";
+                    nombreMes =
+                        nombresMeses[
+                            numeroMes
+                        ];
 
                 }
 
+
+                // ------------------------------------------------
+                // Texto visible
+                // ------------------------------------------------
+
+                let textoArchivo;
+
+
+                if (
+                    numeroNodo === 1
+                ) {
+
+                    textoArchivo =
+                        "Descargar Historial - Nodo 1 - " +
+                        nombreMes +
+                        " " +
+                        anio;
+
+                }
+                else if (
+                    numeroNodo === 2
+                ) {
+
+                    textoArchivo =
+                        "Descargar Historial - Nodo 2 - " +
+                        nombreMes +
+                        " " +
+                        anio;
+
+                }
+                else {
+
+                    textoArchivo =
+                        "Descargar Historial - " +
+                        nombreMes +
+                        " " +
+                        anio;
+
+                }
+
+
+                // ------------------------------------------------
+                // Crear enlace
+                // ------------------------------------------------
+
+                const enlace =
+                    document.createElement(
+                        "a"
+                    );
+
+
+                enlace.href =
+                    "/descargar/" +
+                    encodeURIComponent(
+                        nombreArchivo
+                    );
+
+
+                enlace.textContent =
+                    textoArchivo;
+
+
+                enlace.target =
+                    "_blank";
+
+
+                enlace.download =
+                    nombreArchivo;
+
+
+                enlace.className =
+                    "enlace-csv";
+
+
+                // ------------------------------------------------
+                // Agregar al contenedor
+                // ------------------------------------------------
+
+                contenedor.appendChild(
+                    enlace
+                );
+
+
+                contenedor.appendChild(
+                    document.createElement(
+                        "br"
+                    )
+                );
+
             }
+        );
+
+
+    }
+    catch (error) {
+
+        console.error(
+            "Error cargando la lista de CSV:",
+            error
+        );
+
+
+        const contenedor =
+            document.getElementById(
+                "lista-csv"
+            );
+
+
+        if (contenedor) {
+
+            contenedor.textContent =
+                "Error al cargar los registros históricos";
 
         }
-    );
+
+    }
 
 }
+
+
+// ============================================================
+// MAPA
+// ============================================================
+
+let mapa = null;
+
+let marcadorNodo1 = null;
+let marcadorNodo2 = null;
+
+
+// ============================================================
+// INICIALIZAR MAPA
+// ============================================================
+
+function inicializarMapa() {
+
+    const elementoMapa =
+        document.getElementById(
+            "mapa"
+        );
+
+
+    if (!elementoMapa) {
+        return;
+    }
+
+
+    mapa = L.map(
+        "mapa"
+    ).setView(
+        [
+            -38.84585,
+            -68.07172
+        ],
+        17
+    );
+
+
+    L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+            maxZoom: 19,
+            attribution:
+                "&copy; OpenStreetMap"
+        }
+    ).addTo(
+        mapa
+    );
+
+
+    marcadorNodo1 =
+        L.marker(
+            [
+                -38.845769,
+                -68.071461
+            ]
+        )
+        .addTo(
+            mapa
+        )
+        .bindPopup(
+            "<b>Nodo 1</b><br>Manzana 1"
+        );
+
+
+    marcadorNodo2 =
+        L.marker(
+            [
+                -38.845947,
+                -68.071986
+            ]
+        )
+        .addTo(
+            mapa
+        )
+        .bindPopup(
+            "<b>Nodo 2</b><br>Ciruela 1"
+        );
+
+}
+
+
+// ============================================================
+// INICIAR MAPA
+// ============================================================
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+        inicializarMapa();
+
+    }
+);
