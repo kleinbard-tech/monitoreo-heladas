@@ -7,19 +7,43 @@ from datetime import datetime, timezone, timedelta
 
 import requests
 
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, send_from_directory, request
 
 
 # =====================================================
 # CONFIGURACIÓN
 # =====================================================
 
-THINGSPEAK_CHANNEL_ID = "3506543"
+# =====================================================
+# THINGSPEAK - NODO 1
+# =====================================================
 
-THINGSPEAK_READ_API_KEY = os.environ.get(
-    "THINGSPEAK_READ_API_KEY",
+THINGSPEAK_CHANNEL_NODO1 = "3506543"
+
+THINGSPEAK_READ_API_KEY_NODO1 = os.environ.get(
+    "THINGSPEAK_READ_API_KEY_NODO1",
+    os.environ.get(
+        "THINGSPEAK_READ_API_KEY",
+        ""
+    )
+)
+
+
+# =====================================================
+# THINGSPEAK - NODO 2
+# =====================================================
+
+THINGSPEAK_CHANNEL_NODO2 = "3508298"
+
+THINGSPEAK_READ_API_KEY_NODO2 = os.environ.get(
+    "THINGSPEAK_READ_API_KEY_NODO2",
     ""
 )
+
+
+# =====================================================
+# CONFIGURACIÓN GENERAL DE THINGSPEAK
+# =====================================================
 
 # Python consulta ThingSpeak cada 20 segundos.
 INTERVALO_THINGSPEAK = 20
@@ -61,6 +85,7 @@ TOLERANCIA_MEDICION_MINUTOS = 2
 # El gráfico muestra solamente las últimas 12 horas.
 HORAS_GRAFICO = 12
 
+
 # =====================================================
 # CONFIGURACIÓN DE FLASK
 # =====================================================
@@ -69,25 +94,74 @@ app = Flask(__name__)
 
 
 # =====================================================
+# CONFIGURACIÓN DE NODOS
+# =====================================================
+
+# Tenemos dos nodos.
+#
+# Esto nos permite recorrerlos de forma ordenada
+# en las diferentes funciones del programa.
+NODOS = [1, 2]
+
+
+# =====================================================
 # MEMORIA DE DATOS
 # =====================================================
 
 # Último dato real recibido de cada nodo.
+#
+# Ejemplo:
+#
+# datos_actuales[1]
+# datos_actuales[2]
+#
 datos_actuales = {}
 
-# Historial PROCESADO.
-#
-# IMPORTANTE:
+
+# =====================================================
+# HISTORIAL PROCESADO
+# =====================================================
+
 # Acá no guardamos todas las mediciones de ThingSpeak.
 #
 # Guardamos solamente los registros de 5 minutos.
 historial = []
 
-# Último Entry ID que ya vimos de ThingSpeak.
-ultimo_entry_id_procesado = None
 
-# Momento real en que se recibió el último dato
-# de cada nodo.
+# =====================================================
+# ÚLTIMO ENTRY ID PROCESADO
+# =====================================================
+
+# IMPORTANTE:
+#
+# Cada canal de ThingSpeak tiene su propia numeración
+# de Entry ID.
+#
+# Por eso NO podemos tener una sola variable.
+#
+# Nodo 1:
+# ultimo_entry_id_procesado[1]
+#
+# Nodo 2:
+# ultimo_entry_id_procesado[2]
+#
+ultimo_entry_id_procesado = {
+
+    1: None,
+
+    2: None
+
+}
+
+
+# =====================================================
+# MOMENTO REAL DE RECEPCIÓN
+# =====================================================
+
+# Guarda el momento en que Python recibió el último
+# dato de cada nodo.
+#
+# Se utiliza para determinar si el nodo está conectado.
 ultima_recepcion_nodo = {}
 
 
@@ -95,40 +169,54 @@ ultima_recepcion_nodo = {}
 # MEDICIONES REALES PENDIENTES
 # =====================================================
 
-# Acá almacenamos las mediciones reales recibidas
-# desde ThingSpeak que todavía no fueron asignadas
-# a un intervalo de 5 minutos.
+# Cada nodo tiene su propia lista.
 #
-# Ejemplo:
+# Nodo 1:
 #
-# 18:03
-# 18:05
-# 18:07
+# mediciones_pendientes[1]
 #
-# Luego se utilizarán para generar:
+# Nodo 2:
 #
-# 18:05
+# mediciones_pendientes[2]
 #
-# según cuál sea la más adecuada.
-mediciones_pendientes = []
+mediciones_pendientes = {
+
+    1: [],
+
+    2: []
+
+}
 
 
 # =====================================================
 # MEDICIONES YA UTILIZADAS
 # =====================================================
 
-# Guarda los Entry ID de ThingSpeak que ya fueron
-# utilizados para generar un registro de 5 minutos.
+# Los Entry ID también se mantienen separados.
 #
-# Esto evita utilizar una misma medición dos veces.
-entry_ids_utilizados = set()
+# Un Entry ID del Nodo 1 no debe compararse con
+# uno del Nodo 2.
+entry_ids_utilizados = {
+
+    1: set(),
+
+    2: set()
+
+}
 
 
 # =====================================================
 # ÚLTIMO INTERVALO GENERADO
 # =====================================================
 
-ultimo_intervalo_generado = None
+# Cada nodo tiene su propio intervalo.
+ultimo_intervalo_generado = {
+
+    1: None,
+
+    2: None
+
+}
 
 
 # =====================================================
@@ -347,11 +435,47 @@ def numero_csv(valor):
 
 
 # =====================================================
+# OBTENER CONFIGURACIÓN DEL NODO
+# =====================================================
+
+def obtener_configuracion_nodo(
+    nodo
+):
+
+    if nodo == 1:
+
+        return {
+
+            "channel_id":
+                THINGSPEAK_CHANNEL_NODO1,
+
+            "read_api_key":
+                THINGSPEAK_READ_API_KEY_NODO1
+
+        }
+
+    if nodo == 2:
+
+        return {
+
+            "channel_id":
+                THINGSPEAK_CHANNEL_NODO2,
+
+            "read_api_key":
+                THINGSPEAK_READ_API_KEY_NODO2
+
+        }
+
+    return None
+
+
+# =====================================================
 # PROCESAR REGISTRO DE THINGSPEAK
 # =====================================================
 
 def procesar_registro_thingspeak(
-    registro_ts
+    registro_ts,
+    nodo
 ):
 
     try:
@@ -444,7 +568,7 @@ def procesar_registro_thingspeak(
                 fecha_real,
 
             "nodo":
-                1,
+                nodo,
 
             "medicion":
                 medicion,
@@ -466,6 +590,7 @@ def procesar_registro_thingspeak(
 
             "conectado":
                 True
+
         }
 
         return registro
@@ -474,7 +599,7 @@ def procesar_registro_thingspeak(
 
         print(
             f"⚠ Error procesando registro "
-            f"de ThingSpeak: {e}"
+            f"de ThingSpeak Nodo {nodo}: {e}"
         )
 
         return None
@@ -600,6 +725,7 @@ def guardar_en_csv(
 
         print(
             f"✓ CSV 5 min: {nombre_archivo}"
+            f" -> Nodo {registro.get('nodo')}"
             f" -> {fecha}"
         )
 
@@ -618,9 +744,15 @@ def agregar_medicion_pendiente(
     registro
 ):
 
-    global mediciones_pendientes
-
     if registro is None:
+
+        return
+
+    nodo = registro.get(
+        "nodo"
+    )
+
+    if nodo not in mediciones_pendientes:
 
         return
 
@@ -632,8 +764,8 @@ def agregar_medicion_pendiente(
 
         return
 
-    # Evitar duplicados.
-    for existente in mediciones_pendientes:
+    # Evitar duplicados dentro del nodo.
+    for existente in mediciones_pendientes[nodo]:
 
         if existente.get(
             "medicion"
@@ -643,15 +775,15 @@ def agregar_medicion_pendiente(
 
     # Si ya fue utilizada, no vuelve
     # a entrar como pendiente.
-    if medicion in entry_ids_utilizados:
+    if medicion in entry_ids_utilizados[nodo]:
 
         return
 
-    mediciones_pendientes.append(
+    mediciones_pendientes[nodo].append(
         registro
     )
 
-    mediciones_pendientes.sort(
+    mediciones_pendientes[nodo].sort(
         key=lambda x: x["fechaReal"]
     )
 
@@ -661,8 +793,13 @@ def agregar_medicion_pendiente(
 # =====================================================
 
 def buscar_medicion_para_intervalo(
-    intervalo_objetivo
+    intervalo_objetivo,
+    nodo
 ):
+
+    if nodo not in mediciones_pendientes:
+
+        return None
 
     candidatos = []
 
@@ -680,11 +817,11 @@ def buscar_medicion_para_intervalo(
         tolerancia
     )
 
-    for registro in mediciones_pendientes:
+    for registro in mediciones_pendientes[nodo]:
 
         if registro.get(
             "medicion"
-        ) in entry_ids_utilizados:
+        ) in entry_ids_utilizados[nodo]:
 
             continue
 
@@ -740,22 +877,26 @@ def buscar_medicion_para_intervalo(
 # GENERAR REGISTROS DE 5 MINUTOS
 # =====================================================
 
-def procesar_intervalos_5_minutos():
+def procesar_intervalos_5_minutos(
+    nodo
+):
 
-    global ultimo_intervalo_generado
-    global mediciones_pendientes
-
-    if not mediciones_pendientes:
+    if nodo not in mediciones_pendientes:
 
         return
 
-    # La medición más nueva disponible.
-    mediciones_pendientes.sort(
+    if not mediciones_pendientes[nodo]:
+
+        return
+
+    mediciones_pendientes[nodo].sort(
         key=lambda x: x["fechaReal"]
     )
 
     fecha_mas_nueva = (
-        mediciones_pendientes[-1]["fechaReal"]
+        mediciones_pendientes[nodo][-1][
+            "fechaReal"
+        ]
     )
 
     # El último intervalo que podemos cerrar
@@ -781,10 +922,12 @@ def procesar_intervalos_5_minutos():
         )
     )
 
-    if ultimo_intervalo_generado is None:
+    if ultimo_intervalo_generado[nodo] is None:
 
         primera_fecha = (
-            mediciones_pendientes[0]["fechaReal"]
+            mediciones_pendientes[nodo][0][
+                "fechaReal"
+            ]
         )
 
         primer_intervalo = (
@@ -793,7 +936,7 @@ def procesar_intervalos_5_minutos():
             )
         )
 
-        ultimo_intervalo_generado = (
+        ultimo_intervalo_generado[nodo] = (
             primer_intervalo -
             timedelta(
                 minutes=INTERVALO_REGISTRO_MINUTOS
@@ -801,7 +944,7 @@ def procesar_intervalos_5_minutos():
         )
 
     siguiente_intervalo = (
-        ultimo_intervalo_generado +
+        ultimo_intervalo_generado[nodo] +
         timedelta(
             minutes=INTERVALO_REGISTRO_MINUTOS
         )
@@ -814,19 +957,18 @@ def procesar_intervalos_5_minutos():
 
         registro_elegido = (
             buscar_medicion_para_intervalo(
-                siguiente_intervalo
+                siguiente_intervalo,
+                nodo
             )
         )
 
         if registro_elegido is not None:
 
-            # La medición real solamente puede
-            # utilizarse una vez.
             medicion = registro_elegido[
                 "medicion"
             ]
 
-            entry_ids_utilizados.add(
+            entry_ids_utilizados[nodo].add(
                 medicion
             )
 
@@ -835,18 +977,8 @@ def procesar_intervalos_5_minutos():
                 registro_elegido.copy()
             )
 
-            # MUY IMPORTANTE:
-            #
             # La fecha del registro final pasa
             # a ser la del intervalo de 5 minutos.
-            #
-            # Ejemplo:
-            #
-            # dato real: 18:07
-            # intervalo: 18:05
-            #
-            # CSV:
-            # 18:05
             registro_final[
                 "fechaHora"
             ] = siguiente_intervalo.strftime(
@@ -870,6 +1002,11 @@ def procesar_intervalos_5_minutos():
             print()
             print(
                 "✓ INTERVALO DE 5 MINUTOS"
+            )
+
+            print(
+                f"  Nodo: "
+                f"{nodo}"
             )
 
             print(
@@ -904,11 +1041,12 @@ def procesar_intervalos_5_minutos():
 
             # Eliminar la medición utilizada
             # de las pendientes.
-            mediciones_pendientes = [
+            mediciones_pendientes[nodo] = [
 
                 registro
+
                 for registro
-                in mediciones_pendientes
+                in mediciones_pendientes[nodo]
 
                 if registro.get(
                     "medicion"
@@ -918,23 +1056,20 @@ def procesar_intervalos_5_minutos():
 
         else:
 
-            # No encontramos ninguna medición
-            # dentro de la tolerancia.
-            #
-            # En este caso NO inventamos un dato.
-            #
-            # Dejamos el intervalo sin generar
-            # y avanzamos.
             print()
             print(
                 "⚠ Sin medición válida para intervalo:"
             )
 
             print(
+                f"  Nodo: {nodo}"
+            )
+
+            print(
                 f"  {siguiente_intervalo.strftime('%Y-%m-%d %H:%M:%S')}"
             )
 
-        ultimo_intervalo_generado = (
+        ultimo_intervalo_generado[nodo] = (
             siguiente_intervalo
         )
 
@@ -945,8 +1080,18 @@ def procesar_intervalos_5_minutos():
             )
         )
 
-    # Mantener solamente los últimos 1000
-    # registros procesados en memoria.
+    # Mantener solamente las últimas 1000
+    # mediciones pendientes de cada nodo.
+    if len(
+        mediciones_pendientes[nodo]
+    ) > 1000:
+
+        mediciones_pendientes[nodo] = (
+            mediciones_pendientes[nodo][-1000:]
+        )
+
+    # Mantener los últimos 1000 registros
+    # procesados en memoria.
     #
     # Esto NO afecta los CSV.
     if len(historial) > 1000:
@@ -958,21 +1103,44 @@ def procesar_intervalos_5_minutos():
 # CARGAR HISTORIAL INICIAL DE THINGSPEAK
 # =====================================================
 
-def cargar_historial_inicial():
-
-    global ultimo_entry_id_procesado
+def cargar_historial_nodo(
+    nodo
+):
 
     print()
     print(
-        "========================================"
+        f"----------------------------------------"
     )
 
     print(
-        " CARGANDO HISTORIAL DE THINGSPEAK"
+        f" CARGANDO HISTORIAL - NODO {nodo}"
     )
 
     print(
-        "========================================"
+        f"----------------------------------------"
+    )
+
+    configuracion = (
+        obtener_configuracion_nodo(
+            nodo
+        )
+    )
+
+    if configuracion is None:
+
+        print(
+            f"⚠ Configuración inexistente "
+            f"para Nodo {nodo}"
+        )
+
+        return
+
+    channel_id = (
+        configuracion["channel_id"]
+    )
+
+    read_api_key = (
+        configuracion["read_api_key"]
     )
 
     try:
@@ -980,7 +1148,7 @@ def cargar_historial_inicial():
         url = (
             "https://api.thingspeak.com/"
             f"channels/"
-            f"{THINGSPEAK_CHANNEL_ID}/"
+            f"{channel_id}/"
             "feeds.json"
         )
 
@@ -991,10 +1159,10 @@ def cargar_historial_inicial():
 
         }
 
-        if THINGSPEAK_READ_API_KEY:
+        if read_api_key:
 
             parametros["api_key"] = (
-                THINGSPEAK_READ_API_KEY
+                read_api_key
             )
 
         respuesta = requests.get(
@@ -1015,25 +1183,30 @@ def cargar_historial_inicial():
         if not feeds:
 
             print(
-                "⚠ No hay registros históricos."
+                f"⚠ Nodo {nodo}: "
+                f"no hay registros históricos."
             )
 
-            datos_actuales[1] = {
+            datos_actuales[nodo] = {
 
-                "nodo": 1,
+                "nodo":
+                    nodo,
 
-                "conectado": False,
+                "conectado":
+                    False,
 
-                "estado": "NORMAL",
+                "estado":
+                    "NORMAL",
 
-                "mensaje": "Sin datos"
+                "mensaje":
+                    "Sin datos"
 
             }
 
             return
 
         print(
-            f"✓ ThingSpeak devolvió "
+            f"✓ Nodo {nodo}: ThingSpeak devolvió "
             f"{len(feeds)} registros."
         )
 
@@ -1043,7 +1216,8 @@ def cargar_historial_inicial():
 
             registro = (
                 procesar_registro_thingspeak(
-                    feed
+                    feed,
+                    nodo
                 )
             )
 
@@ -1060,22 +1234,41 @@ def cargar_historial_inicial():
         if not registros_validos:
 
             print(
-                "⚠ No hay registros válidos."
+                f"⚠ Nodo {nodo}: "
+                f"no hay registros válidos."
             )
+
+            datos_actuales[nodo] = {
+
+                "nodo":
+                    nodo,
+
+                "conectado":
+                    False,
+
+                "estado":
+                    "NORMAL",
+
+                "mensaje":
+                    "Sin registros válidos"
+
+            }
 
             return
 
-        # El último dato real recibido
-        # se utiliza para /datos.
+        # =================================================
+        # ÚLTIMO DATO REAL
+        # =================================================
+
         ultimo_registro = (
             registros_validos[-1]
         )
 
-        datos_actuales[1] = (
+        datos_actuales[nodo] = (
             ultimo_registro.copy()
         )
 
-        datos_actuales[1][
+        datos_actuales[nodo][
             "conectado"
         ] = False
 
@@ -1083,49 +1276,40 @@ def cargar_historial_inicial():
         # DETERMINAR CONEXIÓN
         # =================================================
 
-        ahora_utc = datetime.now(
-            timezone.utc
-        )
-
         fecha_ultimo_dato = (
-            obtener_datetime_thingspeak(
-                feeds[-1].get(
-                    "created_at",
-                    ""
-                )
-            )
+            ultimo_registro["fechaReal"]
         )
 
-        if fecha_ultimo_dato is not None:
+        ahora_local = datetime.now()
 
-            segundos_desde_ultimo = (
-                ahora_utc -
-                fecha_ultimo_dato
-            ).total_seconds()
+        segundos_desde_ultimo = (
+            ahora_local -
+            fecha_ultimo_dato
+        ).total_seconds()
 
-            if (
-                segundos_desde_ultimo
-                <= TIEMPO_DESCONEXION
-            ):
+        if (
+            segundos_desde_ultimo
+            <= TIEMPO_DESCONEXION
+        ):
 
-                datos_actuales[1][
-                    "conectado"
-                ] = True
+            datos_actuales[nodo][
+                "conectado"
+            ] = True
 
-                ultima_recepcion_nodo[1] = (
-                    time.time()
-                    - segundos_desde_ultimo
-                )
+            ultima_recepcion_nodo[nodo] = (
+                time.time()
+                - segundos_desde_ultimo
+            )
 
-                print(
-                    "✓ Nodo 1: CONECTADO"
-                )
+            print(
+                f"✓ Nodo {nodo}: CONECTADO"
+            )
 
-            else:
+        else:
 
-                print(
-                    "⚠ Nodo 1: DESCONECTADO"
-                )
+            print(
+                f"⚠ Nodo {nodo}: DESCONECTADO"
+            )
 
         # =================================================
         # AGREGAR MEDICIONES PENDIENTES
@@ -1141,7 +1325,7 @@ def cargar_historial_inicial():
         # ESTABLECER ENTRY ID
         # =================================================
 
-        ultimo_entry_id_procesado = (
+        ultimo_entry_id_procesado[nodo] = (
             ultimo_registro["medicion"]
         )
 
@@ -1149,44 +1333,89 @@ def cargar_historial_inicial():
         # GENERAR HISTORIAL DE 5 MINUTOS
         # =================================================
 
-        procesar_intervalos_5_minutos()
+        procesar_intervalos_5_minutos(
+            nodo
+        )
 
         print()
         print(
-            f"✓ Mediciones reales válidas: "
+            f"✓ Nodo {nodo}: "
+            f"mediciones reales válidas: "
             f"{len(registros_validos)}"
         )
 
         print(
-            f"✓ Registros de 5 minutos generados: "
-            f"{len(historial)}"
+            f"✓ Nodo {nodo}: "
+            f"mediciones pendientes: "
+            f"{len(mediciones_pendientes[nodo])}"
         )
 
         print(
-            f"✓ Mediciones pendientes: "
-            f"{len(mediciones_pendientes)}"
-        )
-
-        print(
-            f"✓ Último Entry ID: "
-            f"{ultimo_entry_id_procesado}"
-        )
-
-        print(
-            "========================================"
+            f"✓ Nodo {nodo}: "
+            f"último Entry ID: "
+            f"{ultimo_entry_id_procesado[nodo]}"
         )
 
     except requests.exceptions.RequestException as e:
 
         print(
-            f"⚠ Error cargando ThingSpeak: {e}"
+            f"⚠ Error cargando ThingSpeak "
+            f"Nodo {nodo}: {e}"
         )
 
     except Exception as e:
 
         print(
-            f"⚠ Error cargando historial: {e}"
+            f"⚠ Error cargando historial "
+            f"Nodo {nodo}: {e}"
         )
+
+
+def cargar_historial_inicial():
+
+    print()
+    print(
+        "========================================"
+    )
+
+    print(
+        " CARGANDO HISTORIAL DE THINGSPEAK"
+    )
+
+    print(
+        "========================================"
+    )
+
+    # Primero Nodo 1.
+    cargar_historial_nodo(1)
+
+    # Después Nodo 2.
+    cargar_historial_nodo(2)
+
+    # Ordenar todo el historial por fecha.
+    historial.sort(
+        key=lambda x: x["fechaReal"]
+    )
+
+    print()
+    print(
+        "========================================"
+    )
+
+    print(
+        " HISTORIAL INICIAL CARGADO"
+    )
+
+    print(
+        "========================================"
+    )
+
+    print(
+        f"Registros de 5 minutos en memoria: "
+        f"{len(historial)}"
+    )
+
+    print()
 
 
 # =====================================================
@@ -1205,33 +1434,33 @@ def actualizar_estado_conexion():
 
             ahora = time.time()
 
-            nodo = 1
+            for nodo in NODOS:
 
-            if nodo in ultima_recepcion_nodo:
+                if nodo in ultima_recepcion_nodo:
 
-                tiempo_sin_datos = (
-                    ahora -
-                    ultima_recepcion_nodo[nodo]
-                )
+                    tiempo_sin_datos = (
+                        ahora -
+                        ultima_recepcion_nodo[nodo]
+                    )
 
-                if (
-                    tiempo_sin_datos
-                    > TIEMPO_DESCONEXION
-                ):
+                    if (
+                        tiempo_sin_datos
+                        > TIEMPO_DESCONEXION
+                    ):
+
+                        if nodo in datos_actuales:
+
+                            datos_actuales[nodo][
+                                "conectado"
+                            ] = False
+
+                else:
 
                     if nodo in datos_actuales:
 
                         datos_actuales[nodo][
                             "conectado"
                         ] = False
-
-            else:
-
-                if nodo in datos_actuales:
-
-                    datos_actuales[nodo][
-                        "conectado"
-                    ] = False
 
             time.sleep(10)
 
@@ -1245,12 +1474,271 @@ def actualizar_estado_conexion():
 
 
 # =====================================================
+# CONSULTAR THINGSPEAK - UN NODO
+# =====================================================
+
+def consultar_thingspeak_nodo(
+    nodo
+):
+
+    configuracion = (
+        obtener_configuracion_nodo(
+            nodo
+        )
+    )
+
+    if configuracion is None:
+
+        return
+
+    channel_id = (
+        configuracion["channel_id"]
+    )
+
+    read_api_key = (
+        configuracion["read_api_key"]
+    )
+
+    try:
+
+        url = (
+            "https://api.thingspeak.com/"
+            f"channels/"
+            f"{channel_id}/"
+            "feeds.json"
+        )
+
+        parametros = {
+
+            "results":
+                100
+
+        }
+
+        if read_api_key:
+
+            parametros["api_key"] = (
+                read_api_key
+            )
+
+        respuesta = requests.get(
+            url,
+            params=parametros,
+            timeout=10
+        )
+
+        respuesta.raise_for_status()
+
+        datos = respuesta.json()
+
+        feeds = datos.get(
+            "feeds",
+            []
+        )
+
+        if not feeds:
+
+            print(
+                f"⚠ ThingSpeak Nodo {nodo}: "
+                f"sin registros."
+            )
+
+            return
+
+        feeds_validos = []
+
+        for feed in feeds:
+
+            try:
+
+                entry_id = int(
+                    feed.get(
+                        "entry_id",
+                        0
+                    )
+                )
+
+            except Exception:
+
+                continue
+
+            ultimo_id = (
+                ultimo_entry_id_procesado[nodo]
+            )
+
+            if (
+                ultimo_id is not None
+                and entry_id <= ultimo_id
+            ):
+
+                continue
+
+            feeds_validos.append(
+                feed
+            )
+
+        feeds_validos.sort(
+            key=lambda x: int(
+                x.get(
+                    "entry_id",
+                    0
+                )
+            )
+        )
+
+        if not feeds_validos:
+
+            print(
+                f"ThingSpeak Nodo {nodo}: "
+                f"sin datos nuevos."
+            )
+
+            return
+
+        # =================================================
+        # PROCESAR NUEVAS MEDICIONES
+        # =================================================
+
+        for feed in feeds_validos:
+
+            registro = (
+                procesar_registro_thingspeak(
+                    feed,
+                    nodo
+                )
+            )
+
+            if registro is None:
+
+                continue
+
+            # -------------------------------------------------
+            # ACTUALIZAR DATOS ACTUALES
+            # -------------------------------------------------
+
+            datos_actuales[nodo] = (
+                registro.copy()
+            )
+
+            datos_actuales[nodo][
+                "conectado"
+            ] = True
+
+            # -------------------------------------------------
+            # ACTUALIZAR ÚLTIMA RECEPCIÓN
+            # -------------------------------------------------
+
+            ultima_recepcion_nodo[nodo] = (
+                time.time()
+            )
+
+            # -------------------------------------------------
+            # AGREGAR A PENDIENTES
+            # -------------------------------------------------
+
+            agregar_medicion_pendiente(
+                registro
+            )
+
+            # -------------------------------------------------
+            # ACTUALIZAR ENTRY ID
+            # -------------------------------------------------
+
+            ultimo_entry_id_procesado[nodo] = (
+                registro["medicion"]
+            )
+
+            # -------------------------------------------------
+            # MOSTRAR INFORMACIÓN
+            # -------------------------------------------------
+
+            print()
+            print(
+                "✓ NUEVA MEDICIÓN REAL"
+            )
+
+            print(
+                f"  Nodo: "
+                f"{nodo}"
+            )
+
+            print(
+                f"  Canal: "
+                f"{channel_id}"
+            )
+
+            print(
+                f"  Entry ID: "
+                f"{registro['medicion']}"
+            )
+
+            print(
+                f"  Fecha real: "
+                f"{registro['fechaReal'].strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+
+            print(
+                f"  DS18B20: "
+                f"{registro['temperaturaDS']:.2f} °C"
+            )
+
+            print(
+                f"  DHT22: "
+                f"{registro['temperaturaDHT']:.2f} °C"
+            )
+
+            print(
+                f"  Humedad: "
+                f"{registro['humedad']:.2f} %"
+            )
+
+            if registro["puntoRocio"] is not None:
+
+                print(
+                    f"  Punto de rocío: "
+                    f"{registro['puntoRocio']:.2f} °C"
+                )
+
+            else:
+
+                print(
+                    "  Punto de rocío: "
+                    "NO DISPONIBLE"
+                )
+
+            print(
+                f"  Estado: "
+                f"{registro['estado']}"
+            )
+
+        # =================================================
+        # PROCESAR INTERVALOS DE 5 MINUTOS
+        # =================================================
+
+        procesar_intervalos_5_minutos(
+            nodo
+        )
+
+    except requests.exceptions.RequestException as e:
+
+        print(
+            f"⚠ Error HTTP consultando "
+            f"ThingSpeak Nodo {nodo}: {e}"
+        )
+
+    except Exception as e:
+
+        print(
+            f"⚠ Error consultando "
+            f"ThingSpeak Nodo {nodo}: {e}"
+        )
+
+
+# =====================================================
 # CONSULTAR THINGSPEAK
 # =====================================================
 
 def consultar_thingspeak():
-
-    global ultimo_entry_id_procesado
 
     print()
     print(
@@ -1258,7 +1746,7 @@ def consultar_thingspeak():
     )
 
     print(
-        " LECTOR THINGSPEAK - NODO 1"
+        " LECTOR THINGSPEAK - NODO 1 + NODO 2"
     )
 
     print(
@@ -1266,7 +1754,13 @@ def consultar_thingspeak():
     )
 
     print(
-        f"Canal: {THINGSPEAK_CHANNEL_ID}"
+        f"Nodo 1 -> Canal: "
+        f"{THINGSPEAK_CHANNEL_NODO1}"
+    )
+
+    print(
+        f"Nodo 2 -> Canal: "
+        f"{THINGSPEAK_CHANNEL_NODO2}"
     )
 
     print(
@@ -1295,216 +1789,25 @@ def consultar_thingspeak():
 
     while True:
 
-        try:
+        # =================================================
+        # NODO 1
+        # =================================================
 
-            url = (
-                "https://api.thingspeak.com/"
-                f"channels/"
-                f"{THINGSPEAK_CHANNEL_ID}/"
-                "feeds.json"
-            )
+        consultar_thingspeak_nodo(1)
 
-            # Pedimos varias mediciones para evitar
-            # perder datos si por alguna razón
-            # Python tarda más en consultar.
-            parametros = {
+        # =================================================
+        # NODO 2
+        # =================================================
 
-                "results":
-                    100
+        consultar_thingspeak_nodo(2)
 
-            }
+        # =================================================
+        # ESPERAR
+        # =================================================
 
-            if THINGSPEAK_READ_API_KEY:
-
-                parametros["api_key"] = (
-                    THINGSPEAK_READ_API_KEY
-                )
-
-            respuesta = requests.get(
-                url,
-                params=parametros,
-                timeout=10
-            )
-
-            respuesta.raise_for_status()
-
-            datos = respuesta.json()
-
-            feeds = datos.get(
-                "feeds",
-                []
-            )
-
-            if not feeds:
-
-                print(
-                    "⚠ ThingSpeak sin registros."
-                )
-
-                time.sleep(
-                    INTERVALO_THINGSPEAK
-                )
-
-                continue
-
-            feeds_validos = []
-
-            for feed in feeds:
-
-                try:
-
-                    entry_id = int(
-                        feed.get(
-                            "entry_id",
-                            0
-                        )
-                    )
-
-                except Exception:
-
-                    continue
-
-                if (
-                    ultimo_entry_id_procesado
-                    is not None
-                    and entry_id
-                    <= ultimo_entry_id_procesado
-                ):
-
-                    continue
-
-                feeds_validos.append(
-                    feed
-                )
-
-            feeds_validos.sort(
-                key=lambda x: int(
-                    x.get(
-                        "entry_id",
-                        0
-                    )
-                )
-            )
-
-            if not feeds_validos:
-
-                print(
-                    f"ThingSpeak: sin datos nuevos."
-                )
-
-                time.sleep(
-                    INTERVALO_THINGSPEAK
-                )
-
-                continue
-
-            # =================================================
-            # PROCESAR NUEVAS MEDICIONES
-            # =================================================
-
-            for feed in feeds_validos:
-
-                registro = (
-                    procesar_registro_thingspeak(
-                        feed
-                    )
-                )
-
-                if registro is None:
-
-                    continue
-
-                datos_actuales[1] = (
-                    registro.copy()
-                )
-
-                datos_actuales[1][
-                    "conectado"
-                ] = True
-
-                ultima_recepcion_nodo[1] = (
-                    time.time()
-                )
-
-                # Agregar a las mediciones reales
-                # pendientes.
-                agregar_medicion_pendiente(
-                    registro
-                )
-
-                ultimo_entry_id_procesado = (
-                    registro["medicion"]
-                )
-
-                print()
-                print(
-                    "✓ NUEVA MEDICIÓN REAL"
-                )
-
-                print(
-                    f"  Entry ID: "
-                    f"{registro['medicion']}"
-                )
-
-                print(
-                    f"  Fecha real: "
-                    f"{registro['fechaReal'].strftime('%Y-%m-%d %H:%M:%S')}"
-                )
-
-                print(
-                    f"  DS18B20: "
-                    f"{registro['temperaturaDS']:.2f} °C"
-                )
-
-                print(
-                    f"  DHT22: "
-                    f"{registro['temperaturaDHT']:.2f} °C"
-                )
-
-                print(
-                    f"  Humedad: "
-                    f"{registro['humedad']:.2f} %"
-                )
-
-                print(
-                    f"  Punto de rocío: "
-                    f"{registro['puntoRocio']:.2f} °C"
-                )
-
-                print(
-                    f"  Estado: "
-                    f"{registro['estado']}"
-                )
-
-            # =================================================
-            # PROCESAR INTERVALOS DE 5 MINUTOS
-            # =================================================
-
-            procesar_intervalos_5_minutos()
-
-            time.sleep(
-                INTERVALO_THINGSPEAK
-            )
-
-        except requests.exceptions.RequestException as e:
-
-            print(
-                f"⚠ Error HTTP consultando ThingSpeak: {e}"
-            )
-
-            time.sleep(
-                INTERVALO_THINGSPEAK
-            )
-
-        except Exception as e:
-
-            print(
-                f"⚠ Error en lector ThingSpeak: {e}"
-            )
-
-            time.sleep(
-                INTERVALO_THINGSPEAK
-            )
+        time.sleep(
+            INTERVALO_THINGSPEAK
+        )
 
 
 # =====================================================
@@ -1702,11 +2005,21 @@ def descargar_csv(
 )
 def recibir_medicion():
 
-    from flask import request
-
     try:
 
         data = request.get_json()
+
+        if data is None:
+
+            return jsonify({
+
+                "status":
+                    "error",
+
+                "message":
+                    "No se recibieron datos"
+
+            }), 400
 
         nodo = int(
             data.get(
@@ -1714,6 +2027,18 @@ def recibir_medicion():
                 1
             )
         )
+
+        if nodo not in NODOS:
+
+            return jsonify({
+
+                "status":
+                    "error",
+
+                "message":
+                    "Nodo inválido"
+
+            }), 400
 
         if (
             "fechaHora" not in data
@@ -1771,6 +2096,8 @@ def recibir_medicion():
                 )
             )
 
+        data["nodo"] = nodo
+
         data["conectado"] = True
 
         ultima_recepcion_nodo[nodo] = (
@@ -1813,28 +2140,9 @@ if __name__ == "__main__":
         exist_ok=True
     )
 
-    cargar_historial_inicial()
-
-    hilo_thingspeak = threading.Thread(
-        target=consultar_thingspeak,
-        daemon=True
-    )
-
-    hilo_thingspeak.start()
-
-    hilo_conexion = threading.Thread(
-        target=actualizar_estado_conexion,
-        daemon=True
-    )
-
-    hilo_conexion.start()
-
-    port = int(
-        os.environ.get(
-            "PORT",
-            5000
-        )
-    )
+    # =================================================
+    # MOSTRAR CONFIGURACIÓN
+    # =================================================
 
     print()
     print(
@@ -1850,28 +2158,34 @@ if __name__ == "__main__":
     )
 
     print()
+
     print(
         " -> Fuente: ThingSpeak"
     )
 
     print(
-        f" -> Canal: {THINGSPEAK_CHANNEL_ID}"
+        f" -> Nodo 1 - Canal: "
+        f"{THINGSPEAK_CHANNEL_NODO1}"
     )
 
     print(
-        " -> Nodo activo: Nodo 1"
+        f" -> Nodo 2 - Canal: "
+        f"{THINGSPEAK_CHANNEL_NODO2}"
     )
 
     print(
-        " -> Transmisión del nodo: cada 2 minutos"
+        " -> Transmisión de los nodos: "
+        "cada 2 minutos"
     )
 
     print(
-        " -> Consulta ThingSpeak: cada 20 segundos"
+        f" -> Consulta ThingSpeak: "
+        f"cada {INTERVALO_THINGSPEAK} segundos"
     )
 
     print(
-        " -> Registros CSV: cada 5 minutos"
+        f" -> Registros CSV: "
+        f"cada {INTERVALO_REGISTRO_MINUTOS} minutos"
     )
 
     print(
@@ -1879,7 +2193,8 @@ if __name__ == "__main__":
     )
 
     print(
-        f" -> Gráfico: últimas {HORAS_GRAFICO} horas"
+        f" -> Gráfico: últimas "
+        f"{HORAS_GRAFICO} horas"
     )
 
     print(
@@ -1908,9 +2223,48 @@ if __name__ == "__main__":
         " -> Codificación: UTF-8-SIG"
     )
 
+    # =================================================
+    # CARGAR HISTORIAL
+    # =================================================
+
+    cargar_historial_inicial()
+
+    # =================================================
+    # HILO THINGSPEAK
+    # =================================================
+
+    hilo_thingspeak = threading.Thread(
+        target=consultar_thingspeak,
+        daemon=True
+    )
+
+    hilo_thingspeak.start()
+
+    # =================================================
+    # HILO ESTADO DE CONEXIÓN
+    # =================================================
+
+    hilo_conexion = threading.Thread(
+        target=actualizar_estado_conexion,
+        daemon=True
+    )
+
+    hilo_conexion.start()
+
+    # =================================================
+    # PUERTO
+    # =================================================
+
+    port = int(
+        os.environ.get(
+            "PORT",
+            5000
+        )
+    )
+
     print(
-        " -> Flask escuchando en puerto:",
-        port
+        f" -> Flask escuchando en puerto: "
+        f"{port}"
     )
 
     print(
