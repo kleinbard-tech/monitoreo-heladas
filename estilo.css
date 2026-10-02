@@ -318,6 +318,8 @@ body {
     position: relative;
     width: 100%;
     height: 300px;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 .contenedor-grafico-scroll {
