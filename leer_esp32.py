@@ -1888,52 +1888,144 @@ def obtener_datos():
 # HISTORIAL PARA EL GRÁFICO
 # =====================================================
 
+
 @app.route(
     "/historial",
     methods=["GET"]
 )
 def obtener_historial():
 
-    # =================================================
-    # TOMAR SOLAMENTE LAS ÚLTIMAS 12 HORAS
-    # =================================================
-
     ahora = datetime.now()
 
     limite = (
         ahora -
-        timedelta(
-            hours=HORAS_GRAFICO
-        )
+        timedelta(hours=HORAS_GRAFICO)
     )
 
-    historial_grafico = []
+    registros_por_fecha = {}
 
-    for registro in historial:
+    carpeta_base = "registros_5min"
 
-        try:
+    for nodo in NODOS:
 
-            fecha_texto = registro.get(
-                "fechaHora",
-                ""
-            )
+        carpeta_nodo = os.path.join(
+            carpeta_base,
+            f"nodo_{nodo}"
+        )
 
-            fecha_registro = (
-                datetime.strptime(
-                    fecha_texto,
-                    "%Y-%m-%d %H:%M:%S"
-                )
-            )
-
-            if fecha_registro >= limite:
-
-                historial_grafico.append(
-                    registro
-                )
-
-        except Exception:
-
+        if not os.path.isdir(carpeta_nodo):
             continue
+
+        archivos = sorted(
+            nombre
+            for nombre in os.listdir(carpeta_nodo)
+            if nombre.endswith(".csv")
+        )
+
+        for nombre_archivo in archivos:
+
+            ruta_archivo = os.path.join(
+                carpeta_nodo,
+                nombre_archivo
+            )
+
+            try:
+
+                with open(
+                    ruta_archivo,
+                    mode="r",
+                    newline="",
+                    encoding="utf-8-sig"
+                ) as archivo:
+
+                    lector = csv.DictReader(
+                        archivo,
+                        delimiter=";"
+                    )
+
+                    for fila in lector:
+
+                        try:
+
+                            fecha_texto = fila["FechaHora"]
+
+                            fecha = datetime.strptime(
+                                fecha_texto,
+                                "%Y-%m-%d %H:%M:%S"
+                            )
+
+                            if fecha < limite or fecha > ahora:
+                                continue
+
+                            punto_rocio_texto = fila["PuntoRocio"]
+
+                            if punto_rocio_texto.strip():
+
+                                punto_rocio = float(
+                                    punto_rocio_texto.replace(",", ".")
+                                )
+
+                            else:
+
+                                punto_rocio = None
+
+                            registro = {
+
+                                "fechaHora": fecha_texto,
+
+                                "nodo": nodo,
+
+                                "temperaturaDS": float(
+                                    fila["TemperaturaDS"].replace(",", ".")
+                                ),
+
+                                "temperaturaDHT": float(
+                                    fila["TemperaturaDHT"].replace(",", ".")
+                                ),
+
+                                "humedad": float(
+                                    fila["Humedad"].replace(",", ".")
+                                ),
+
+                                "puntoRocio": punto_rocio,
+
+                                "estado": fila["Estado"],
+
+                                "conectado": True
+
+                            }
+
+                            clave = (
+                                nodo,
+                                fecha_texto
+                            )
+
+                            registros_por_fecha[clave] = registro
+
+                        except (
+                            ValueError,
+                            KeyError,
+                            TypeError
+                        ) as error:
+
+                            print(
+                                f"Error leyendo una fila de "
+                                f"{nombre_archivo}: {error}"
+                            )
+
+            except OSError as error:
+
+                print(
+                    f"Error leyendo {ruta_archivo}: {error}"
+                )
+
+    historial_grafico = sorted(
+        registros_por_fecha.values(),
+        key=lambda registro: (
+            registro["fechaHora"],
+            registro["nodo"]
+        )
+    )
 
     return jsonify(
         historial_grafico
