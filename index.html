@@ -139,7 +139,44 @@
             </div>
 
         </section>
+        <!-- 3. REFERENCIA METEOROLÓGICA EXTERNA DEL INTA -->
+        <section class="viento-inta">
+            <div class="viento-inta-header">
+                <div>
+                    <h2>Referencia Meteorológica — INTA Cinco Saltos</h2>
+                    <p>Datos externos de la estación meteorológica de referencia</p>
+                </div>
+                <span class="viento-inta-icono">🌬️</span>
+            </div>
 
+            <div class="viento-inta-datos">
+                <div class="viento-inta-dato">
+                    <span class="etiqueta">Dirección del viento</span>
+                    <span class="valor" id="viento-direccion">--</span>
+                </div>
+
+                <div class="viento-inta-dato viento-inta-principal">
+                    <span class="etiqueta">Velocidad del viento</span>
+                    <span class="valor" id="viento-velocidad">-- km/h</span>
+                </div>
+            </div>
+
+            <div class="viento-inta-pie">
+                <p id="viento-actualizacion">
+                    Esperando datos de la estación del INTA...
+                </p>
+
+                <a
+                    href="https://sipan.inta.gob.ar/agrometeorologia/met/45/clima.htm"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    Consultar fuente original del INTA ↗
+                </a>
+            </div>
+        </section>
+
+        
         <!-- 3. GRÁFICA DE TEMPERATURA -->
         <section class="grafica">
             <div class="grafica-header">
