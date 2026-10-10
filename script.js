@@ -3,6 +3,7 @@
 // =====================================================
 const URL_DATOS = "/datos";
 const URL_HISTORIAL = "/historial";
+const URL_VIENTO = "/viento";
 // =====================================================
 // CONTROL DEL DESPLAZAMIENTO DE LA GRÁFICA
 // =====================================================
@@ -70,7 +71,98 @@ const graficaTemperatura = new Chart(ctx, {
         }
     }
 });
+// =====================================================
+// ACTUALIZAR REFERENCIA METEOROLÓGICA DEL INTA
+// =====================================================
+async function actualizarVientoINTA() {
 
+    try {
+
+        const respuesta = await fetch(URL_VIENTO);
+
+        if (!respuesta.ok) {
+            throw new Error(
+                "Error HTTP: " + respuesta.status
+            );
+        }
+
+        const viento = await respuesta.json();
+
+        const elementoDireccion =
+            document.getElementById("viento-direccion");
+
+        const elementoVelocidad =
+            document.getElementById("viento-velocidad");
+
+        const elementoActualizacion =
+            document.getElementById("viento-actualizacion");
+
+
+        // Comprobar si el INTA entregó datos válidos
+        if (
+            viento.disponible &&
+            viento.velocidad !== null &&
+            viento.direccion
+        ) {
+
+            // Mostrar dirección del viento
+            elementoDireccion.textContent =
+                viento.direccion;
+
+
+            // Mostrar velocidad con coma decimal
+            const velocidad =
+                Number(viento.velocidad);
+
+            elementoVelocidad.textContent =
+                velocidad.toLocaleString(
+                    "es-AR",
+                    {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 2
+                    }
+                ) + " " + (viento.unidad || "km/h");
+
+
+            // Mostrar fecha y hora publicadas por el INTA
+            if (viento.fecha && viento.hora) {
+
+                elementoActualizacion.textContent =
+                    "Último dato publicado por INTA: " +
+                    viento.fecha + " " +
+                    viento.hora;
+
+            } else {
+
+                elementoActualizacion.textContent =
+                    "Datos recibidos correctamente desde INTA.";
+            }
+
+        } else {
+
+            // El servidor respondió, pero no hay datos disponibles
+            elementoDireccion.textContent = "--";
+            elementoVelocidad.textContent = "-- km/h";
+
+            elementoActualizacion.textContent =
+                viento.mensaje ||
+                "No hay datos disponibles de la estación del INTA.";
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Error obteniendo datos del viento del INTA:",
+            error
+        );
+
+        document.getElementById(
+            "viento-actualizacion"
+        ).textContent =
+            "No se pudo actualizar la referencia meteorológica.";
+
+    }
+}
 // =====================================================
 // ACTUALIZAR HISTORIAL
 // =====================================================
@@ -516,32 +608,36 @@ function actualizarEstado(
 
 
 // =====================================================
-// INICIALIZACIÓN Y EVENTOS
+// INICIALIZACIÓN Y ACTUALIZACIÓN AUTOMÁTICA
 // =====================================================
-document
-    .getElementById(
-        "seleccionNodo"
-    )
-    .addEventListener(
-        "change",
-        actualizarGrafica
-    );
 
+// Actualizar los dos nodos
 actualizarDatos();
 
+// Actualizar el historial de temperaturas
 actualizarHistorial();
 
+// Consultar los datos meteorológicos del INTA
+actualizarVientoINTA();
+
+
+// Actualización de los nodos cada 2 segundos
 setInterval(
     actualizarDatos,
     2000
 );
 
+// Actualización del historial cada 5 segundos
 setInterval(
     actualizarHistorial,
     5000
 );
 
-
+// Actualización de la referencia del INTA cada 60 segundos
+setInterval(
+    actualizarVientoINTA,
+    60000
+);
 // =====================================================
 // LÓGICA DEL MAPA DESPLEGABLE
 // =====================================================
