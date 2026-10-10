@@ -3,6 +3,10 @@
 // =====================================================
 const URL_DATOS = "/datos";
 const URL_HISTORIAL = "/historial";
+// =====================================================
+// CONTROL DEL DESPLAZAMIENTO DE LA GRÁFICA
+// =====================================================
+let seguirUltimasMediciones = true;
 
 // =====================================================
 // DATOS DE NODO PARA GRÁFICAS
@@ -140,28 +144,41 @@ async function actualizarHistorial() {
 }
 
 
+
+
 function actualizarGrafica() {
 
     const nodoSeleccionado =
-        document.getElementById(
-            "seleccionNodo"
-        ).value;
+        document.getElementById("seleccionNodo").value;
 
     const datos =
         datosNodos[nodoSeleccionado];
 
     const contenedorScroll =
-        document.querySelector(
-            ".contenedor-grafico-scroll"
-        );
+        document.querySelector(".contenedor-grafico-scroll");
 
     const areaGrafica =
-        document.querySelector(
-            ".area-grafica"
-        );
+        document.querySelector(".area-grafica");
+
+    // Guardar la posición actual y comprobar si estaba al final
+    let posicionAnterior = 0;
+    let estabaAlFinal = true;
+
+    if (areaGrafica) {
+
+        posicionAnterior = areaGrafica.scrollLeft;
+
+        const distanciaAlFinal =
+            areaGrafica.scrollWidth -
+            areaGrafica.clientWidth -
+            areaGrafica.scrollLeft;
+
+        estabaAlFinal = distanciaAlFinal <= 10;
+    }
 
     if (
         contenedorScroll &&
+        areaGrafica &&
         datos.horarios.length > 0
     ) {
 
@@ -189,13 +206,57 @@ function actualizarGrafica() {
 
     graficaTemperatura.resize();
 
-    graficaTemperatura.update();
+    graficaTemperatura.update("none");
 
     if (areaGrafica) {
 
-        areaGrafica.scrollLeft =
-            areaGrafica.scrollWidth;
+        if (seguirUltimasMediciones && estabaAlFinal) {
+
+            // Seguir automáticamente las mediciones recientes
+            areaGrafica.scrollLeft =
+                areaGrafica.scrollWidth;
+
+        } else {
+
+            // Mantener la posición de consulta del usuario
+            areaGrafica.scrollLeft =
+                Math.min(
+                    posicionAnterior,
+                    areaGrafica.scrollWidth -
+                    areaGrafica.clientWidth
+                );
+
+            seguirUltimasMediciones = false;
+        }
     }
+}
+
+// =====================================================
+// DETECTAR SI EL USUARIO SE DESPLAZA HACIA ATRÁS
+// =====================================================
+const areaGraficaScroll =
+    document.querySelector(".area-grafica");
+
+if (areaGraficaScroll) {
+
+    areaGraficaScroll.addEventListener("scroll", function () {
+
+        const distanciaAlFinal =
+            this.scrollWidth -
+            this.clientWidth -
+            this.scrollLeft;
+
+        // Si está cerca del extremo derecho,
+        // activamos nuevamente el seguimiento automático
+        if (distanciaAlFinal <= 10) {
+
+            seguirUltimasMediciones = true;
+
+        } else {
+
+            seguirUltimasMediciones = false;
+        }
+    });
 }
 
 
