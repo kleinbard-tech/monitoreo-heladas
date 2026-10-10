@@ -435,7 +435,7 @@ details[open] .icono-desplegar {
 .viento-inta {
     background-color: #ffffff;
     color: #1e293b;
-    padding: 20px 24px;
+    padding: 14px 20px;
     border-radius: 10px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
     border-left: 4px solid #0f766e;
@@ -444,19 +444,20 @@ details[open] .icono-desplegar {
 /* ENCABEZADO */
 
 .viento-inta-header {
-    margin-bottom: 18px;
+    margin-bottom: 10px;
 }
 
 .viento-inta-header h2 {
     font-size: 17px;
     font-weight: 600;
     color: #0f172a;
-    margin-bottom: 5px;
+    margin: 0 0 3px 0;
 }
 
 .viento-inta-header p {
-    font-size: 13px;
+    font-size: 12px;
     color: #64748b;
+    margin: 0;
 }
 
 /* VALORES */
@@ -464,18 +465,18 @@ details[open] .icono-desplegar {
 .viento-inta-datos {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    gap: 10px;
 }
 
 .viento-inta-dato {
     background-color: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 7px;
-    padding: 14px 16px;
+    padding: 9px 14px;
 
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
 }
 
 .viento-inta-dato .etiqueta {
@@ -485,12 +486,12 @@ details[open] .icono-desplegar {
 }
 
 .viento-inta-dato .valor {
-    font-size: 25px;
+    font-size: 22px;
     font-weight: 700;
     color: #0f172a;
 }
 
-/* VELOCIDAD */
+/* VELOCIDAD DEL VIENTO EN NEGRO */
 
 .viento-inta-principal {
     background-color: #f8fafc;
@@ -498,31 +499,32 @@ details[open] .icono-desplegar {
 }
 
 .viento-inta-principal .valor {
-    color: #0f766e;
+    color: #0f172a;
 }
 
 /* FECHA Y FUENTE */
 
 .viento-inta-pie {
-    margin-top: 14px;
-    padding-top: 12px;
+    margin-top: 9px;
+    padding-top: 8px;
     border-top: 1px solid #e2e8f0;
 
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .viento-inta-pie p {
-    font-size: 12px;
+    font-size: 11px;
     color: #64748b;
+    margin: 0;
 }
 
 .viento-inta-pie a {
     color: #0f766e;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     text-decoration: none;
 }
@@ -535,15 +537,20 @@ details[open] .icono-desplegar {
 
 @media (max-width: 600px) {
     .viento-inta {
-        padding: 16px;
+        padding: 12px;
     }
 
     .viento-inta-datos {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .viento-inta-dato {
+        padding: 9px;
     }
 
     .viento-inta-dato .valor {
-        font-size: 23px;
+        font-size: 20px;
     }
 
     .viento-inta-pie {
