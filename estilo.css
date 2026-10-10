@@ -433,8 +433,13 @@ details[open] .icono-desplegar {
    ===================================================== */
 
 .viento-inta {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+
     background-color: #ffffff;
     color: #1e293b;
+
     padding: 14px 20px;
     border-radius: 10px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
@@ -444,7 +449,11 @@ details[open] .icono-desplegar {
 /* ENCABEZADO */
 
 .viento-inta-header {
-    margin-bottom: 10px;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    background: transparent;
+    margin: 0 0 10px 0;
 }
 
 .viento-inta-header h2 {
@@ -464,11 +473,16 @@ details[open] .icono-desplegar {
 
 .viento-inta-datos {
     display: grid;
+    width: 100%;
+    box-sizing: border-box;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
 }
 
 .viento-inta-dato {
+    min-width: 0;
+    box-sizing: border-box;
+
     background-color: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 7px;
@@ -505,15 +519,19 @@ details[open] .icono-desplegar {
 /* FECHA Y FUENTE */
 
 .viento-inta-pie {
-    margin-top: 9px;
-    padding-top: 8px;
-    border-top: 1px solid #e2e8f0;
-
     display: flex;
+    width: 100%;
+    box-sizing: border-box;
+
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     gap: 6px;
+
+    background: transparent;
+    margin-top: 9px;
+    padding-top: 8px;
+    border-top: 1px solid #e2e8f0;
 }
 
 .viento-inta-pie p {
@@ -546,11 +564,11 @@ details[open] .icono-desplegar {
     }
 
     .viento-inta-dato {
-        padding: 9px;
+        padding: 8px;
     }
 
     .viento-inta-dato .valor {
-        font-size: 20px;
+        font-size: 19px;
     }
 
     .viento-inta-pie {
