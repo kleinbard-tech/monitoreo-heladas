@@ -9,6 +9,10 @@ import requests
 
 from flask import Flask, jsonify, send_from_directory, request
 
+import re
+import html
+from html.parser import HTMLParser
+
 
 # =====================================================
 # CONFIGURACIÓN
@@ -52,6 +56,127 @@ INTERVALO_THINGSPEAK = 20
 # de 10 minutos sin recibir una medición.
 TIEMPO_DESCONEXION = 600
 
+
+# =====================================================
+# REFERENCIA EXTERNA DE VIENTO - INTA CINCO SALTOS
+# =====================================================
+
+URL_VIENTO_INTA = "https://sipan.inta.gob.ar/agrometeorologia/met/45/clima.htm"
+
+INTERVALO_VIENTO_INTA = 300  # Consultar cada 5 minutos
+
+viento_actual = {
+    "disponible": False,
+    "direccion": None,
+    "velocidad": None,
+    "fecha": None,
+    "hora": None,
+    "mensaje": "Esperando datos de la estación del INTA"
+}
+
+
+class LectorTextoHTML(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.fragmentos = []
+
+    def handle_data(self, data):
+        self.fragmentos.append(data)
+
+    def obtener_texto(self):
+        return " ".join(self.fragmentos)
+
+
+def consultar_viento_inta():
+    global viento_actual
+
+    try:
+        respuesta = requests.get(
+            URL_VIENTO_INTA,
+            headers={
+                "User-Agent": "Mozilla/5.0"
+            },
+            timeout=15
+        )
+
+        respuesta.raise_for_status()
+
+        lector = LectorTextoHTML()
+        lector.feed(respuesta.text)
+
+        texto = html.unescape(lector.obtener_texto())
+        texto = re.sub(r"\s+", " ", texto)
+
+        # Extraer dirección y velocidad del viento.
+        patron_viento = (
+            r"Viento:\s*([A-ZÁÉÍÓÚÑ]+)\s+a\s+"
+            r"([\d.,]+)\s*km\s*/\s*hr"
+        )
+
+        coincidencia = re.search(
+            patron_viento,
+            texto,
+            re.IGNORECASE
+        )
+
+        if not coincidencia:
+            raise ValueError(
+                "No se encontraron los datos de viento en la página"
+            )
+
+        direccion = coincidencia.group(1).upper()
+        velocidad = float(
+            coincidencia.group(2).replace(",", ".")
+        )
+
+        # Extraer fecha y hora publicadas por el INTA.
+        patron_fecha_hora = (
+            r"Fecha:\s*(\d{1,2}/\d{1,2}/\d{2,4})"
+            r"\s+Hora:\s*(\d{1,2}:\d{2})"
+        )
+
+        coincidencia_fecha = re.search(
+            patron_fecha_hora,
+            texto,
+            re.IGNORECASE
+        )
+
+        fecha = None
+        hora = None
+
+        if coincidencia_fecha:
+            fecha = coincidencia_fecha.group(1)
+            hora = coincidencia_fecha.group(2)
+
+        viento_actual = {
+            "disponible": True,
+            "direccion": direccion,
+            "velocidad": velocidad,
+            "unidad": "km/h",
+            "fecha": fecha,
+            "hora": hora,
+            "mensaje": "Datos recibidos correctamente",
+            "fuente": URL_VIENTO_INTA
+        }
+
+        print(
+            f"[INTA] Viento: {direccion}, "
+            f"{velocidad} km/h | "
+            f"Fecha: {fecha} | Hora: {hora}"
+        )
+
+    except Exception as error:
+        print(f"[INTA] Error al consultar el viento: {error}")
+
+        viento_actual = {
+            "disponible": False,
+            "direccion": None,
+            "velocidad": None,
+            "fecha": None,
+            "hora": None,
+            "mensaje": "No se pudieron obtener los datos del INTA",
+            "fuente": URL_VIENTO_INTA
+        }
 
 # =====================================================
 # CONFIGURACIÓN DE LOS REGISTROS
@@ -2265,6 +2390,15 @@ def recibir_medicion():
 
         }), 400
 
+@app.route("/viento")
+def obtener_viento():
+    return jsonify(viento_actual)
+
+def tarea_viento_inta():
+    while True:
+        consultar_viento_inta()
+        time.sleep(INTERVALO_VIENTO_INTA)
+
 
 # =====================================================
 # INICIO DEL SERVIDOR
@@ -2385,6 +2519,21 @@ if __name__ == "__main__":
 
     cargar_historial_inicial()
 
+
+    
+    # =================================================
+    # HILO VIENTO INTA
+    # =================================================
+
+    hilo_viento = threading.Thread(
+        target=tarea_viento_inta,
+        daemon=True
+    )
+
+    hilo_viento.start()
+
+
+
     # =================================================
     # HILO THINGSPEAK
     # =================================================
@@ -2407,6 +2556,9 @@ if __name__ == "__main__":
 
     hilo_conexion.start()
 
+
+
+    
     # =================================================
     # PUERTO
     # =================================================
