@@ -41,7 +41,7 @@ const graficaTemperatura = new Chart(ctx, {
 
         datasets: [
             {
-                label: "Temperatura DS18B20 (≈ 2 m, abrigo meteorológico)",
+                label: "Temperatura DS18B20",
                 data: [],
                 borderColor: "#2563eb",
                 backgroundColor: "rgba(37, 99, 235, 0.1)",
@@ -51,7 +51,7 @@ const graficaTemperatura = new Chart(ctx, {
                 pointHoverRadius: 6
             },
             {
-                label: "Temperatura DHT22 (≈ 70 cm, abrigo meteorológico)",
+                label: "Temperatura DHT22",
                 data: [],
                 borderColor: "#16a34a",
                 backgroundColor: "rgba(22, 163, 74, 0.08)",
@@ -61,7 +61,7 @@ const graficaTemperatura = new Chart(ctx, {
                 pointHoverRadius: 6
             },
             {
-                label: "Punto de rocío (calculado con DHT22 y humedad)",
+                label: "Punto de rocío",
                 data: [],
                 borderColor: "#0891b2",
                 borderDash: [5, 5],
@@ -80,6 +80,23 @@ const graficaTemperatura = new Chart(ctx, {
         interaction: {
             mode: "index",
             intersect: false
+        },
+
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        let label = context.dataset.label || '';
+                        if (label) {
+                            label += ': ';
+                        }
+                        if (context.parsed.y !== null) {
+                            label += context.parsed.y + ' °C';
+                        }
+                        return label;
+                    }
+                }
+            }
         },
 
         scales: {
