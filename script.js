@@ -4,6 +4,7 @@
 const URL_DATOS = "/datos";
 const URL_HISTORIAL = "/historial";
 const URL_VIENTO = "/viento";
+
 // =====================================================
 // CONTROL DEL DESPLAZAMIENTO DE LA GRÁFICA
 // =====================================================
@@ -13,8 +14,18 @@ let seguirUltimasMediciones = true;
 // DATOS DE NODO PARA GRÁFICAS
 // =====================================================
 const datosNodos = {
-    nodo1: { horarios: [], temperatura: [], puntoRocio: [] },
-    nodo2: { horarios: [], temperatura: [], puntoRocio: [] }
+    nodo1: {
+        horarios: [],
+        temperaturaDS: [],
+        temperaturaDHT: [],
+        puntoRocio: []
+    },
+    nodo2: {
+        horarios: [],
+        temperaturaDS: [],
+        temperaturaDHT: [],
+        puntoRocio: []
+    }
 };
 
 // =====================================================
@@ -24,11 +35,13 @@ const ctx = document.getElementById("graficaTemperatura");
 
 const graficaTemperatura = new Chart(ctx, {
     type: "line",
+
     data: {
         labels: [],
+
         datasets: [
             {
-                label: "Temperatura DS18B20",
+                label: "Temperatura DS18B20 (≈ 2 m, abrigo meteorológico)",
                 data: [],
                 borderColor: "#2563eb",
                 backgroundColor: "rgba(37, 99, 235, 0.1)",
@@ -38,23 +51,37 @@ const graficaTemperatura = new Chart(ctx, {
                 pointHoverRadius: 6
             },
             {
-                label: "Punto de rocío",
+                label: "Temperatura DHT22 (≈ 70 cm, abrigo meteorológico)",
+                data: [],
+                borderColor: "#16a34a",
+                backgroundColor: "rgba(22, 163, 74, 0.08)",
+                tension: 0.3,
+                fill: false,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            },
+            {
+                label: "Punto de rocío (calculado con DHT22 y humedad)",
                 data: [],
                 borderColor: "#0891b2",
                 borderDash: [5, 5],
                 tension: 0.3,
+                fill: false,
                 pointRadius: 4,
                 pointHoverRadius: 6
             }
         ]
     },
+
     options: {
         responsive: true,
         maintainAspectRatio: false,
+
         interaction: {
-            mode: 'index',
+            mode: "index",
             intersect: false
         },
+
         scales: {
             y: {
                 title: {
@@ -62,6 +89,7 @@ const graficaTemperatura = new Chart(ctx, {
                     text: "Temperatura (°C)"
                 }
             },
+
             x: {
                 title: {
                     display: true,
@@ -71,6 +99,7 @@ const graficaTemperatura = new Chart(ctx, {
         }
     }
 });
+
 // =====================================================
 // ACTUALIZAR REFERENCIA METEOROLÓGICA DEL INTA
 // =====================================================
@@ -81,9 +110,7 @@ async function actualizarVientoINTA() {
         const respuesta = await fetch(URL_VIENTO);
 
         if (!respuesta.ok) {
-            throw new Error(
-                "Error HTTP: " + respuesta.status
-            );
+            throw new Error("Error HTTP: " + respuesta.status);
         }
 
         const viento = await respuesta.json();
@@ -97,7 +124,6 @@ async function actualizarVientoINTA() {
         const elementoActualizacion =
             document.getElementById("viento-actualizacion");
 
-
         // Comprobar si el INTA entregó datos válidos
         if (
             viento.disponible &&
@@ -105,24 +131,16 @@ async function actualizarVientoINTA() {
             viento.direccion
         ) {
 
-            // Mostrar dirección del viento
-            elementoDireccion.textContent =
-                viento.direccion;
-
+            elementoDireccion.textContent = viento.direccion;
 
             // Mostrar velocidad con coma decimal
-            const velocidad =
-                Number(viento.velocidad);
+            const velocidad = Number(viento.velocidad);
 
             elementoVelocidad.textContent =
-                velocidad.toLocaleString(
-                    "es-AR",
-                    {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 2
-                    }
-                ) + " " + (viento.unidad || "km/h");
-
+                velocidad.toLocaleString("es-AR", {
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 2
+                }) + " " + (viento.unidad || "km/h");
 
             // Mostrar fecha y hora publicadas por el INTA
             if (viento.fecha && viento.hora) {
@@ -140,7 +158,6 @@ async function actualizarVientoINTA() {
 
         } else {
 
-            // El servidor respondió, pero no hay datos disponibles
             elementoDireccion.textContent = "--";
             elementoVelocidad.textContent = "-- km/h";
 
@@ -160,9 +177,9 @@ async function actualizarVientoINTA() {
             "viento-actualizacion"
         ).textContent =
             "No se pudo actualizar la referencia meteorológica.";
-
     }
 }
+
 // =====================================================
 // ACTUALIZAR HISTORIAL
 // =====================================================
@@ -170,59 +187,56 @@ async function actualizarHistorial() {
 
     try {
 
-        const respuesta = await fetch(
-            URL_HISTORIAL
-        );
+        const respuesta = await fetch(URL_HISTORIAL);
+
+        if (!respuesta.ok) {
+            throw new Error("Error HTTP: " + respuesta.status);
+        }
 
         const historial = await respuesta.json();
 
+        // Reiniciar los datos de ambos nodos
         datosNodos.nodo1 = {
             horarios: [],
-            temperatura: [],
+            temperaturaDS: [],
+            temperaturaDHT: [],
             puntoRocio: []
         };
 
         datosNodos.nodo2 = {
             horarios: [],
-            temperatura: [],
+            temperaturaDS: [],
+            temperaturaDHT: [],
             puntoRocio: []
         };
 
-        historial.forEach(
-            dato => {
+        historial.forEach(dato => {
 
-                const nodo =
-                    "nodo" + dato.nodo;
+            const nodo = "nodo" + dato.nodo;
 
-                if (
-                    !datosNodos[nodo]
-                ) {
-                    return;
-                }
-
-                const hora =
-                    dato.fechaHora.substring(
-                        11,
-                        16
-                    );
-
-                datosNodos[nodo]
-                    .horarios
-                    .push(hora);
-
-                datosNodos[nodo]
-                    .temperatura
-                    .push(
-                        dato.temperaturaDS
-                    );
-
-                datosNodos[nodo]
-                    .puntoRocio
-                    .push(
-                        dato.puntoRocio
-                    );
+            if (!datosNodos[nodo]) {
+                return;
             }
-        );
+
+            const hora = dato.fechaHora.substring(11, 16);
+
+            datosNodos[nodo].horarios.push(hora);
+
+            // Temperatura del sensor DS18B20
+            datosNodos[nodo].temperaturaDS.push(
+                dato.temperaturaDS
+            );
+
+            // Temperatura del sensor DHT22
+            datosNodos[nodo].temperaturaDHT.push(
+                dato.temperaturaDHT
+            );
+
+            // Punto de rocío
+            datosNodos[nodo].puntoRocio.push(
+                dato.puntoRocio
+            );
+        });
 
         actualizarGrafica();
 
@@ -235,16 +249,15 @@ async function actualizarHistorial() {
     }
 }
 
-
-
-
+// =====================================================
+// ACTUALIZAR GRÁFICA SEGÚN EL NODO SELECCIONADO
+// =====================================================
 function actualizarGrafica() {
 
     const nodoSeleccionado =
         document.getElementById("seleccionNodo").value;
 
-    const datos =
-        datosNodos[nodoSeleccionado];
+    const datos = datosNodos[nodoSeleccionado];
 
     const contenedorScroll =
         document.querySelector(".contenedor-grafico-scroll");
@@ -268,6 +281,7 @@ function actualizarGrafica() {
         estabaAlFinal = distanciaAlFinal <= 10;
     }
 
+    // Ajustar el ancho del gráfico según la cantidad de mediciones
     if (
         contenedorScroll &&
         areaGrafica &&
@@ -277,29 +291,34 @@ function actualizarGrafica() {
         const anchoMinimoContainer =
             areaGrafica.clientWidth;
 
-        const anchoCalculado =
-            Math.max(
-                anchoMinimoContainer,
-                datos.horarios.length * 35
-            );
+        const anchoCalculado = Math.max(
+            anchoMinimoContainer,
+            datos.horarios.length * 35
+        );
 
         contenedorScroll.style.width =
             `${anchoCalculado}px`;
     }
 
-    graficaTemperatura.data.labels =
-        datos.horarios;
+    // Actualizar las etiquetas del eje horizontal
+    graficaTemperatura.data.labels = datos.horarios;
 
+    // CURVA 1: Temperatura DS18B20
     graficaTemperatura.data.datasets[0].data =
-        datos.temperatura;
+        datos.temperaturaDS;
 
+    // CURVA 2: Temperatura DHT22
     graficaTemperatura.data.datasets[1].data =
+        datos.temperaturaDHT;
+
+    // CURVA 3: Punto de rocío
+    graficaTemperatura.data.datasets[2].data =
         datos.puntoRocio;
 
     graficaTemperatura.resize();
-
     graficaTemperatura.update("none");
 
+    // Mantener el comportamiento del desplazamiento horizontal
     if (areaGrafica) {
 
         if (seguirUltimasMediciones && estabaAlFinal) {
@@ -311,12 +330,11 @@ function actualizarGrafica() {
         } else {
 
             // Mantener la posición de consulta del usuario
-            areaGrafica.scrollLeft =
-                Math.min(
-                    posicionAnterior,
-                    areaGrafica.scrollWidth -
-                    areaGrafica.clientWidth
-                );
+            areaGrafica.scrollLeft = Math.min(
+                posicionAnterior,
+                areaGrafica.scrollWidth -
+                areaGrafica.clientWidth
+            );
 
             seguirUltimasMediciones = false;
         }
@@ -339,7 +357,7 @@ if (areaGraficaScroll) {
             this.scrollLeft;
 
         // Si está cerca del extremo derecho,
-        // activamos nuevamente el seguimiento automático
+        // activar nuevamente el seguimiento automático
         if (distanciaAlFinal <= 10) {
 
             seguirUltimasMediciones = true;
@@ -351,7 +369,6 @@ if (areaGraficaScroll) {
     });
 }
 
-
 // =====================================================
 // ACTUALIZAR DATOS EN TIEMPO REAL
 // =====================================================
@@ -359,36 +376,27 @@ async function actualizarDatos() {
 
     try {
 
-        const respuesta =
-            await fetch(
-                URL_DATOS
-            );
+        const respuesta = await fetch(URL_DATOS);
 
-        const datos =
-            await respuesta.json();
+        if (!respuesta.ok) {
+            throw new Error("Error HTTP: " + respuesta.status);
+        }
 
-        [1, 2].forEach(
-            num => {
+        const datos = await respuesta.json();
 
-                if (datos[num]) {
+        [1, 2].forEach(num => {
 
-                    actualizarNodo(
-                        num,
-                        datos[num]
-                    );
+            if (datos[num]) {
 
-                } else {
+                actualizarNodo(num, datos[num]);
 
-                    marcarDesconectado(
-                        num
-                    );
-                }
+            } else {
+
+                marcarDesconectado(num);
             }
-        );
+        });
 
-        actualizarEstado(
-            datos
-        );
+        actualizarEstado(datos);
 
     } catch (error) {
 
@@ -399,113 +407,85 @@ async function actualizarDatos() {
     }
 }
 
-
-function actualizarNodo(
-    numeroNodo,
-    dato
-) {
+// =====================================================
+// ACTUALIZAR TARJETAS DE CADA NODO
+// =====================================================
+function actualizarNodo(numeroNodo, dato) {
 
     const elConexion =
-        document.getElementById(
-            `nodo${numeroNodo}-conexion`
-        );
+        document.getElementById(`nodo${numeroNodo}-conexion`);
 
-    if (
-        dato.conectado === false
-    ) {
+    if (dato.conectado === false) {
 
-        marcarDesconectado(
-            numeroNodo
-        );
-
+        marcarDesconectado(numeroNodo);
         return;
     }
 
-    elConexion.className =
-        "conexion conectado";
+    elConexion.className = "conexion conectado";
 
     elConexion
-        .querySelector(
-            ".texto-conexion"
-        )
-        .textContent =
-        "Conectado";
+        .querySelector(".texto-conexion")
+        .textContent = "Conectado";
 
+    // Temperatura DS18B20
     document.getElementById(
         `nodo${numeroNodo}-temperaturaDS`
     ).textContent =
-        dato.temperaturaDS.toFixed(2)
-        + " °C";
+        dato.temperaturaDS.toFixed(2) + " °C";
 
+    // Temperatura DHT22
     document.getElementById(
         `nodo${numeroNodo}-temperaturaDHT`
     ).textContent =
-        dato.temperaturaDHT.toFixed(2)
-        + " °C";
+        dato.temperaturaDHT.toFixed(2) + " °C";
 
+    // Humedad relativa
     document.getElementById(
         `nodo${numeroNodo}-humedad`
     ).textContent =
-        dato.humedad.toFixed(2)
-        + " %";
+        dato.humedad.toFixed(2) + " %";
 
+    // Punto de rocío
     document.getElementById(
         `nodo${numeroNodo}-puntoRocio`
     ).textContent =
-        dato.puntoRocio.toFixed(2)
-        + " °C";
+        dato.puntoRocio.toFixed(2) + " °C";
 
+    // Fecha y hora de la última medición
     document.getElementById(
         `nodo${numeroNodo}-actualizacion`
     ).textContent =
-        "Última medición: "
-        + dato.fechaHora;
+        "Última medición: " + dato.fechaHora;
 }
 
-
-function marcarDesconectado(
-    numeroNodo
-) {
+// =====================================================
+// MARCAR NODO COMO DESCONECTADO
+// =====================================================
+function marcarDesconectado(numeroNodo) {
 
     const elConexion =
-        document.getElementById(
-            `nodo${numeroNodo}-conexion`
-        );
+        document.getElementById(`nodo${numeroNodo}-conexion`);
 
-    elConexion.className =
-        "conexion desconectado";
+    elConexion.className = "conexion desconectado";
 
     elConexion
-        .querySelector(
-            ".texto-conexion"
-        )
-        .textContent =
-        "Desconectado";
+        .querySelector(".texto-conexion")
+        .textContent = "Desconectado";
 }
 
-
 // =====================================================
-// ACTUALIZAR ESTADO INTELIGENTE
+// ACTUALIZAR ESTADO GENERAL
 // =====================================================
-function actualizarEstado(
-    datos
-) {
+function actualizarEstado(datos) {
 
-    let estadoGeneral =
-        "NORMAL";
-
+    let estadoGeneral = "NORMAL";
     let nodosEnAlerta = [];
+    let cantidadNodosConectados = 0;
 
-    let cantidadNodosConectados =
-        0;
+    // Recorrer los datos recibidos
+    for (const numNodo in datos) {
 
-    // Recorremos los datos recibidos
-    for (
-        const numNodo in datos
-    ) {
-
-        const infoNodo =
-            datos[numNodo];
+        const infoNodo = datos[numNodo];
 
         if (
             infoNodo &&
@@ -519,93 +499,63 @@ function actualizarEstado(
                 infoNodo.estado !== "NORMAL"
             ) {
 
-                estadoGeneral =
-                    infoNodo.estado;
+                estadoGeneral = infoNodo.estado;
 
-                if (
-                    numNodo == 1
-                ) {
-
-                    nodosEnAlerta.push(
-                        "Nodo 1 (Manzana 1)"
-                    );
+                if (numNodo == 1) {
+                    nodosEnAlerta.push("Nodo 1 (Manzana 1)");
                 }
 
-                if (
-                    numNodo == 2
-                ) {
-
-                    nodosEnAlerta.push(
-                        "Nodo 2 (Ciruela 1)"
-                    );
+                if (numNodo == 2) {
+                    nodosEnAlerta.push("Nodo 2 (Ciruela 1)");
                 }
             }
         }
     }
 
     const elementoEstado =
-        document.getElementById(
-            "estadoGeneral"
-        );
+        document.getElementById("estadoGeneral");
 
     const mensajeEstado =
-        document.getElementById(
-            "mensajeEstado"
-        );
+        document.getElementById("mensajeEstado");
 
-    // CASO 1:
-    // Ningún nodo reporta conexión activa
-    if (
-        cantidadNodosConectados === 0
-    ) {
+    // CASO 1: ningún nodo reporta conexión activa
+    if (cantidadNodosConectados === 0) {
 
-        elementoEstado.textContent =
-            "DESCONECTADO";
+        elementoEstado.textContent = "DESCONECTADO";
 
         mensajeEstado.textContent =
             "⚠ Sin comunicación con los nodos de la chacra.";
 
-        elementoEstado.style.color =
-            "#64748b";
+        elementoEstado.style.color = "#64748b";
 
         return;
     }
 
-    // CASO 2:
-    // Hay nodos conectados
-    elementoEstado.textContent =
-        estadoGeneral;
+    // CASO 2: hay nodos conectados
+    elementoEstado.textContent = estadoGeneral;
 
-    if (
-        nodosEnAlerta.length === 0
-    ) {
+    if (nodosEnAlerta.length === 0) {
 
         mensajeEstado.textContent =
             "Sin indicios de helada en este momento.";
 
-        elementoEstado.style.color =
-            "#16a34a";
+        elementoEstado.style.color = "#16a34a";
 
-    } else if (
-        nodosEnAlerta.length === 1
-    ) {
+    } else if (nodosEnAlerta.length === 1) {
 
         mensajeEstado.textContent =
             `⚠ ¡Alerta de helada detectada en ${nodosEnAlerta[0]}!`;
 
-        elementoEstado.style.color =
-            "#dc2626";
+        elementoEstado.style.color = "#dc2626";
 
     } else {
 
         mensajeEstado.textContent =
             `⚠ ¡ALERTA GENERAL DE HELADA! Afecta a: ${nodosEnAlerta.join(" y ")}.`;
 
-        elementoEstado.style.color =
-            "#dc2626";
+        elementoEstado.style.color = "#dc2626";
     }
 }
-
 
 // =====================================================
 // INICIALIZACIÓN Y ACTUALIZACIÓN AUTOMÁTICA
@@ -620,24 +570,15 @@ actualizarHistorial();
 // Consultar los datos meteorológicos del INTA
 actualizarVientoINTA();
 
-
 // Actualización de los nodos cada 2 segundos
-setInterval(
-    actualizarDatos,
-    2000
-);
+setInterval(actualizarDatos, 2000);
 
 // Actualización del historial cada 5 segundos
-setInterval(
-    actualizarHistorial,
-    5000
-);
+setInterval(actualizarHistorial, 5000);
 
 // Actualización de la referencia del INTA cada 60 segundos
-setInterval(
-    actualizarVientoINTA,
-    60000
-);
+setInterval(actualizarVientoINTA, 60000);
+
 // =====================================================
 // LÓGICA DEL MAPA DESPLEGABLE
 // =====================================================
@@ -651,128 +592,88 @@ const coordenadasNodo2 = [
     -68.071986
 ];
 
-let mapaInicializado =
-    false;
-
+let mapaInicializado = false;
 let mapa;
-
 
 function inicializarMapa() {
 
-    if (
-        mapaInicializado
-    ) {
+    if (mapaInicializado) {
         return;
     }
 
-    mapa =
-        L.map(
-            'mapa'
-        ).setView(
-            coordenadasNodo1,
-            18
-        );
+    mapa = L.map("mapa").setView(
+        coordenadasNodo1,
+        18
+    );
 
     L.tileLayer(
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
         {
             attribution:
-                'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS'
+                "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS"
         }
-    ).addTo(
-        mapa
-    );
+    ).addTo(mapa);
 
-    const marcadorNodo1 =
-        L.marker(
-            coordenadasNodo1
-        )
+    const marcadorNodo1 = L.marker(coordenadasNodo1)
         .addTo(mapa)
         .bindPopup(
-            '<b>Nodo 1 (Manzana 1)</b><br>Chacra Experimental FACA'
+            "<b>Nodo 1 (Manzana 1)</b><br>Chacra Experimental FACA"
         );
 
-    const marcadorNodo2 =
-        L.marker(
-            coordenadasNodo2
-        )
+    const marcadorNodo2 = L.marker(coordenadasNodo2)
         .addTo(mapa)
         .bindPopup(
-            '<b>Nodo 2 (Ciruela 1)</b><br>Chacra Experimental FACA'
+            "<b>Nodo 2 (Ciruela 1)</b><br>Chacra Experimental FACA"
         );
 
-    const grupoNodos =
-        L.featureGroup([
-            marcadorNodo1,
-            marcadorNodo2
-        ]);
+    const grupoNodos = L.featureGroup([
+        marcadorNodo1,
+        marcadorNodo2
+    ]);
 
     mapa.fitBounds(
-        grupoNodos
-            .getBounds()
-            .pad(0.4)
+        grupoNodos.getBounds().pad(0.4)
     );
 
-    mapaInicializado =
-        true;
+    mapaInicializado = true;
 }
 
-
+// Inicializar el mapa al desplegar su sección
 const desplegableMapa =
-    document.getElementById(
-        'desplegableMapa'
-    );
+    document.getElementById("desplegableMapa");
 
-if (
-    desplegableMapa
-) {
+if (desplegableMapa) {
 
-    desplegableMapa.addEventListener(
-        'toggle',
-        function() {
+    desplegableMapa.addEventListener("toggle", function () {
 
-            if (
-                desplegableMapa.open
-            ) {
+        if (desplegableMapa.open) {
 
-                inicializarMapa();
+            inicializarMapa();
 
-                setTimeout(
-                    () => {
+            setTimeout(() => {
 
-                        if (mapa) {
+                if (mapa) {
+                    mapa.invalidateSize();
+                }
 
-                            mapa.invalidateSize();
-                        }
-
-                    },
-                    100
-                );
-            }
+            }, 100);
         }
-    );
+    });
 }
-
 
 // =====================================================
 // LÓGICA DEL DESPLEGABLE DE HISTORIAL CSV MENSUAL
 // =====================================================
 const desplegableHistorial =
-    document.getElementById(
-        'desplegableHistorial'
-    );
+    document.getElementById("desplegableHistorial");
 
-let historialCargado =
-    false;
+let historialCargado = false;
 
-
-if (
-    desplegableHistorial
-) {
+if (desplegableHistorial) {
 
     desplegableHistorial.addEventListener(
-        'toggle',
-        async function() {
+        "toggle",
+        async function () {
 
             if (
                 desplegableHistorial.open &&
@@ -781,13 +682,17 @@ if (
 
                 try {
 
-                    const respuesta =
-                        await fetch(
-                            '/api/archivos-csv'
-                        );
+                    const respuesta = await fetch(
+                        "/api/archivos-csv"
+                    );
 
-                    const archivos =
-                        await respuesta.json();
+                    if (!respuesta.ok) {
+                        throw new Error(
+                            "Error HTTP: " + respuesta.status
+                        );
+                    }
+
+                    const archivos = await respuesta.json();
 
                     console.log(
                         "Archivos CSV recibidos:",
@@ -795,238 +700,153 @@ if (
                     );
 
                     const contenedorLista =
-                        document.getElementById(
-                            'listaArchivosCsv'
-                        );
+                        document.getElementById("listaArchivosCsv");
 
-                    contenedorLista.innerHTML =
-                        '';
+                    contenedorLista.innerHTML = "";
 
-                    if (
-                        archivos.length === 0
-                    ) {
+                    if (archivos.length === 0) {
 
                         contenedorLista.innerHTML =
-                            '<li>No hay registros mensuales guardados todavía.</li>';
+                            "<li>No hay registros mensuales guardados todavía.</li>";
 
                         return;
                     }
 
-                    archivos.forEach(
-                        archivo => {
+                    archivos.forEach(archivo => {
 
-                            // =================================================
-                            // OBTENER EL NOMBRE DEL ARCHIVO
-                            // =================================================
+                        // Obtener el nombre del archivo
+                        let nombreArchivo = "";
 
-                            let nombreArchivo =
+                        if (typeof archivo === "string") {
+
+                            nombreArchivo = archivo;
+
+                        } else if (
+                            typeof archivo === "object" &&
+                            archivo !== null
+                        ) {
+
+                            nombreArchivo =
+                                archivo.archivo ||
+                                archivo.nombre ||
+                                archivo.filename ||
+                                archivo.name ||
+                                archivo.file ||
                                 "";
+                        }
+
+                        if (!nombreArchivo) {
+
+                            console.warn(
+                                "No se pudo obtener el nombre del archivo:",
+                                archivo
+                            );
+
+                            return;
+                        }
+
+                        // Obtener el número de nodo
+                        let numeroNodo = null;
+
+                        if (
+                            typeof archivo === "object" &&
+                            archivo !== null &&
+                            archivo.nodo !== undefined
+                        ) {
+
+                            numeroNodo = Number(archivo.nodo);
+                        }
+
+                        // Si no viene el nodo, intentar obtenerlo del nombre
+                        if (
+                            numeroNodo === null ||
+                            Number.isNaN(numeroNodo)
+                        ) {
 
                             if (
-                                typeof archivo ===
-                                "string"
-                            ) {
-
-                                nombreArchivo =
-                                    archivo;
-
-                            } else if (
-                                typeof archivo ===
-                                "object" &&
-                                archivo !== null
-                            ) {
-
-                                nombreArchivo =
-                                    archivo.archivo ||
-                                    archivo.nombre ||
-                                    archivo.filename ||
-                                    archivo.name ||
-                                    archivo.file ||
-                                    "";
-                            }
-
-                            if (
-                                !nombreArchivo
-                            ) {
-
-                                console.warn(
-                                    "No se pudo obtener el nombre del archivo:",
-                                    archivo
-                                );
-
-                                return;
-                            }
-
-
-                            // =================================================
-                            // OBTENER EL NODO
-                            // =================================================
-
-                            let numeroNodo =
-                                null;
-
-                            if (
-                                typeof archivo ===
-                                "object" &&
-                                archivo !== null &&
-                                archivo.nodo !== undefined
-                            ) {
-
-                                numeroNodo =
-                                    Number(
-                                        archivo.nodo
-                                    );
-                            }
-
-
-                            // =================================================
-                            // SI NO VIENE EL NODO,
-                            // INTENTAR OBTENERLO DEL NOMBRE
-                            // =================================================
-
-                            if (
-                                numeroNodo === null ||
-                                Number.isNaN(
-                                    numeroNodo
+                                nombreArchivo.startsWith(
+                                    "historial_nodo1_"
                                 )
                             ) {
 
-                                if (
-                                    nombreArchivo.startsWith(
-                                        "historial_nodo1_"
-                                    )
-                                ) {
-
-                                    numeroNodo =
-                                        1;
-
-                                } else if (
-                                    nombreArchivo.startsWith(
-                                        "historial_nodo2_"
-                                    )
-                                ) {
-
-                                    numeroNodo =
-                                        2;
-                                }
-                            }
-
-
-                            // =================================================
-                            // EXTRAER AÑO Y MES
-                            // =================================================
-
-                            const partes =
-                                nombreArchivo
-                                    .replace(
-                                        /^historial_nodo[12]_/,
-                                        ''
-                                    )
-                                    .replace(
-                                        '.csv',
-                                        ''
-                                    )
-                                    .split('-');
-
-                            let anio =
-                                partes[0];
-
-                            let mesNum =
-                                partes[1];
-
-
-                            // =================================================
-                            // NOMBRES DE LOS MESES
-                            // =================================================
-
-                            const meses = {
-
-                                "01": "Enero",
-                                "02": "Febrero",
-                                "03": "Marzo",
-                                "04": "Abril",
-                                "05": "Mayo",
-                                "06": "Junio",
-                                "07": "Julio",
-                                "08": "Agosto",
-                                "09": "Septiembre",
-                                "10": "Octubre",
-                                "11": "Noviembre",
-                                "12": "Diciembre"
-
-                            };
-
-
-                            const nombreMes =
-                                meses[mesNum] ||
-                                mesNum;
-
-
-                            // =================================================
-                            // NOMBRE DEL NODO
-                            // =================================================
-
-                            let nombreNodo =
-                                "Nodo";
-
-                            if (
-                                numeroNodo === 1
-                            ) {
-
-                                nombreNodo =
-                                    "Nodo 1 (Manzana 1)";
+                                numeroNodo = 1;
 
                             } else if (
-                                numeroNodo === 2
+                                nombreArchivo.startsWith(
+                                    "historial_nodo2_"
+                                )
                             ) {
 
-                                nombreNodo =
-                                    "Nodo 2 (Ciruela 1)";
+                                numeroNodo = 2;
                             }
-
-
-                            // =================================================
-                            // CREAR ELEMENTO
-                            // =================================================
-
-                            const li =
-                                document.createElement(
-                                    'li'
-                                );
-
-
-                            // =================================================
-                            // CREAR LINK DE DESCARGA
-                            // =================================================
-
-                            li.innerHTML = `
-                                <a
-                                    href="/descargar/${numeroNodo}/${encodeURIComponent(nombreArchivo)}"
-                                    target="_blank"
-                                    style="
-                                        display: inline-block;
-                                        background-color: #0284c7;
-                                        color: white;
-                                        padding: 6px 14px;
-                                        border-radius: 6px;
-                                        text-decoration: none;
-                                        font-size: 13px;
-                                        font-weight: 600;
-                                    "
-                                >
-                                    📥 Descargar registro mensual - ${nombreNodo} - ${nombreMes} ${anio}
-                                </a>
-                            `;
-
-                            contenedorLista.appendChild(
-                                li
-                            );
-
                         }
-                    );
 
-                    historialCargado =
-                        true;
+                        // Extraer año y mes
+                        const partes = nombreArchivo
+                            .replace(/^historial_nodo[12]_/, "")
+                            .replace(".csv", "")
+                            .split("-");
+
+                        const anio = partes[0];
+                        const mesNum = partes[1];
+
+                        // Nombres de los meses
+                        const meses = {
+                            "01": "Enero",
+                            "02": "Febrero",
+                            "03": "Marzo",
+                            "04": "Abril",
+                            "05": "Mayo",
+                            "06": "Junio",
+                            "07": "Julio",
+                            "08": "Agosto",
+                            "09": "Septiembre",
+                            "10": "Octubre",
+                            "11": "Noviembre",
+                            "12": "Diciembre"
+                        };
+
+                        const nombreMes = meses[mesNum] || mesNum;
+
+                        // Nombre del nodo
+                        let nombreNodo = "Nodo";
+
+                        if (numeroNodo === 1) {
+
+                            nombreNodo = "Nodo 1 (Manzana 1)";
+
+                        } else if (numeroNodo === 2) {
+
+                            nombreNodo = "Nodo 2 (Ciruela 1)";
+                        }
+
+                        // Crear elemento de lista
+                        const li = document.createElement("li");
+
+                        // Crear enlace de descarga
+                        li.innerHTML = `
+                            <a
+                                href="/descargar/${numeroNodo}/${encodeURIComponent(nombreArchivo)}"
+                                target="_blank"
+                                style="
+                                    display: inline-block;
+                                    background-color: #0284c7;
+                                    color: white;
+                                    padding: 6px 14px;
+                                    border-radius: 6px;
+                                    text-decoration: none;
+                                    font-size: 13px;
+                                    font-weight: 600;
+                                "
+                            >
+                                📥 Descargar registro mensual - ${nombreNodo} - ${nombreMes} ${anio}
+                            </a>
+                        `;
+
+                        contenedorLista.appendChild(li);
+                    });
+
+                    historialCargado = true;
 
                 } catch (error) {
 
@@ -1036,12 +856,10 @@ if (
                     );
 
                     const contenedorLista =
-                        document.getElementById(
-                            'listaArchivosCsv'
-                        );
+                        document.getElementById("listaArchivosCsv");
 
                     contenedorLista.innerHTML =
-                        '<li>Error al cargar los registros históricos.</li>';
+                        "<li>Error al cargar los registros históricos.</li>";
                 }
             }
         }
