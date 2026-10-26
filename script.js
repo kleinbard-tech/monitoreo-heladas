@@ -681,204 +681,94 @@ if (desplegableMapa) {
 // =====================================================
 // LÓGICA DEL DESPLEGABLE DE HISTORIAL CSV MENSUAL
 // =====================================================
-const desplegableHistorial =
-    document.getElementById("desplegableHistorial");
-
+const desplegableHistorial = document.getElementById("desplegableHistorial");
 let historialCargado = false;
 
 if (desplegableHistorial) {
+    desplegableHistorial.addEventListener("toggle", async function () {
+        if (desplegableHistorial.open && !historialCargado) {
+            try {
+                const respuesta = await fetch("/api/archivos-csv");
 
-    desplegableHistorial.addEventListener(
-        "toggle",
-        async function () {
-
-            if (
-                desplegableHistorial.open &&
-                !historialCargado
-            ) {
-
-                try {
-
-                    const respuesta = await fetch(
-                        "/api/archivos-csv"
-                    );
-
-                    if (!respuesta.ok) {
-                        throw new Error(
-                            "Error HTTP: " + respuesta.status
-                        );
-                    }
-
-                    const archivos = await respuesta.json();
-
-                    console.log(
-                        "Archivos CSV recibidos:",
-                        archivos
-                    );
-
-                    const contenedorLista =
-                        document.getElementById("listaArchivosCsv");
-
-                    contenedorLista.innerHTML = "";
-
-                    if (archivos.length === 0) {
-
-                        contenedorLista.innerHTML =
-                            "<li>No hay registros mensuales guardados todavía.</li>";
-
-                        return;
-                    }
-
-                    archivos.forEach(archivo => {
-
-                        // Obtener el nombre del archivo
-                        let nombreArchivo = "";
-
-                        if (typeof archivo === "string") {
-
-                            nombreArchivo = archivo;
-
-                        } else if (
-                            typeof archivo === "object" &&
-                            archivo !== null
-                        ) {
-
-                            nombreArchivo =
-                                archivo.archivo ||
-                                archivo.nombre ||
-                                archivo.filename ||
-                                archivo.name ||
-                                archivo.file ||
-                                "";
-                        }
-
-                        if (!nombreArchivo) {
-
-                            console.warn(
-                                "No se pudo obtener el nombre del archivo:",
-                                archivo
-                            );
-
-                            return;
-                        }
-
-                        // Obtener el número de nodo
-                        let numeroNodo = null;
-
-                        if (
-                            typeof archivo === "object" &&
-                            archivo !== null &&
-                            archivo.nodo !== undefined
-                        ) {
-
-                            numeroNodo = Number(archivo.nodo);
-                        }
-
-                        // Si no viene el nodo, intentar obtenerlo del nombre
-                        if (
-                            numeroNodo === null ||
-                            Number.isNaN(numeroNodo)
-                        ) {
-
-                            if (
-                                nombreArchivo.startsWith(
-                                    "historial_nodo1_"
-                                )
-                            ) {
-
-                                numeroNodo = 1;
-
-                            } else if (
-                                nombreArchivo.startsWith(
-                                    "historial_nodo2_"
-                                )
-                            ) {
-
-                                numeroNodo = 2;
-                            }
-                        }
-
-                        // Extraer año y mes
-                        const partes = nombreArchivo
-                            .replace(/^historial_nodo[12]_/, "")
-                            .replace(".csv", "")
-                            .split("-");
-
-                        const anio = partes[0];
-                        const mesNum = partes[1];
-
-                        // Nombres de los meses
-                        const meses = {
-                            "01": "Enero",
-                            "02": "Febrero",
-                            "03": "Marzo",
-                            "04": "Abril",
-                            "05": "Mayo",
-                            "06": "Junio",
-                            "07": "Julio",
-                            "08": "Agosto",
-                            "09": "Septiembre",
-                            "10": "Octubre",
-                            "11": "Noviembre",
-                            "12": "Diciembre"
-                        };
-
-                        const nombreMes = meses[mesNum] || mesNum;
-
-                        // Nombre del nodo
-                        let nombreNodo = "Nodo";
-
-                        if (numeroNodo === 1) {
-
-                            nombreNodo = "Nodo 1 (Manzana 1)";
-
-                        } else if (numeroNodo === 2) {
-
-                            nombreNodo = "Nodo 2 (Ciruela 1)";
-                        }
-
-                        // Crear elemento de lista
-                        const li = document.createElement("li");
-
-                        // Crear enlace de descarga
-                        li.innerHTML = `
-                            <a
-                                href="/descargar/${numeroNodo}/${encodeURIComponent(nombreArchivo)}"
-                                target="_blank"
-                                style="
-                                    display: inline-block;
-                                    background-color: #0284c7;
-                                    color: white;
-                                    padding: 6px 14px;
-                                    border-radius: 6px;
-                                    text-decoration: none;
-                                    font-size: 13px;
-                                    font-weight: 600;
-                                "
-                            >
-                                📥 Descargar registro mensual - ${nombreNodo} - ${nombreMes} ${anio}
-                            </a>
-                        `;
-
-                        contenedorLista.appendChild(li);
-                    });
-
-                    historialCargado = true;
-
-                } catch (error) {
-
-                    console.error(
-                        "Error cargando la lista de CSV:",
-                        error
-                    );
-
-                    const contenedorLista =
-                        document.getElementById("listaArchivosCsv");
-
-                    contenedorLista.innerHTML =
-                        "<li>Error al cargar los registros históricos.</li>";
+                if (!respuesta.ok) {
+                    throw new Error("Error HTTP: " + respuesta.status);
                 }
+
+                const archivos = await respuesta.json();
+                const contenedorLista = document.getElementById("listaArchivosCsv");
+                contenedorLista.innerHTML = "";
+
+                if (archivos.length === 0) {
+                    contenedorLista.innerHTML = "<li>No hay registros mensuales guardados todavía.</li>";
+                    return;
+                }
+
+                archivos.forEach(archivo => {
+                    let nombreArchivo = typeof archivo === "string" ? archivo : (archivo.archivo || archivo.nombre || "");
+                    let numeroNodo = typeof archivo === "object" && archivo.nodo !== undefined ? Number(archivo.nodo) : null;
+
+                    if (!nombreArchivo) return;
+
+                    // Si el backend no pasó el número de nodo en el objeto, obtenerlo del nombre
+                    if (numeroNodo === null || Number.isNaN(numeroNodo)) {
+                        if (nombreArchivo.includes("nodo1") || nombreArchivo.includes("nodo_1")) {
+                            numeroNodo = 1;
+                        } else if (nombreArchivo.includes("nodo2") || nombreArchivo.includes("nodo_2")) {
+                            numeroNodo = 2;
+                        } else {
+                            numeroNodo = 1;
+                        }
+                    }
+
+                    // Limpiar el nombre para extraer YYYY-MM
+                    const limpio = nombreArchivo
+                        .replace(/^historial_/, "")
+                        .replace(/^nodo[12]_/, "")
+                        .replace(".csv", "");
+
+                    const partes = limpio.split("-");
+                    const anio = partes[0].replace(/\D/g, ""); // Dejar solo números (ej: 2026)
+                    const mesNum = partes[1] ? partes[1].substring(0, 2) : "";
+
+                    const meses = {
+                        "01": "Enero", "02": "Febrero", "03": "Marzo", "04": "Abril",
+                        "05": "Mayo", "06": "Junio", "07": "Julio", "08": "Agosto",
+                        "09": "Septiembre", "10": "Octubre", "11": "Noviembre", "12": "Diciembre"
+                    };
+
+                    const nombreMes = meses[mesNum] || mesNum;
+                    const nombreNodo = numeroNodo === 1 ? "Nodo 1 (Manzana 1)" : "Nodo 2 (Ciruela 1)";
+
+                    const li = document.createElement("li");
+                    li.innerHTML = `
+                        <a
+                            href="/descargar/${numeroNodo}/${encodeURIComponent(nombreArchivo)}"
+                            target="_blank"
+                            style="
+                                display: inline-block;
+                                background-color: #0284c7;
+                                color: white;
+                                padding: 6px 14px;
+                                border-radius: 6px;
+                                text-decoration: none;
+                                font-size: 13px;
+                                font-weight: 600;
+                            "
+                        >
+                            📥 Descargar registro mensual - ${nombreNodo} - ${nombreMes} ${anio}
+                        </a>
+                    `;
+
+                    contenedorLista.appendChild(li);
+                });
+
+                historialCargado = true;
+
+            } catch (error) {
+                console.error("Error cargando la lista de CSV:", error);
+                const contenedorLista = document.getElementById("listaArchivosCsv");
+                contenedorLista.innerHTML = "<li>Error al cargar los registros históricos.</li>";
             }
         }
-    );
+    });
 }
